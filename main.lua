@@ -4,7 +4,7 @@ local success, Rayfield = pcall(function()
 end)
 
 if not success or not Rayfield then
-    warn("Rayfield UI 라이브러리를 불러오지 못했습니다. 인터넷 연결이나 실행기를 확인하세요.")
+    warn("Rayfield UI 라이브러리를 불러오지 못했습니다.")
     return
 end
 
@@ -24,44 +24,55 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
--- [[ 스크립트 실행 함수 (에러 방지 및 종료 처리) ]]
-local function ExecuteAndClose(name, url)
-    -- 알림 표시
+-- [[ 전역 변수 설정 ]]
+local CloseOnExecute = true -- 실행 후 UI를 닫을지 여부
+
+-- [[ 스크립트 실행 핵심 함수 ]]
+local function ExecuteScript(name, url)
     Rayfield:Notify({
-        Title = "Executing: " .. name,
-        Content = "스크립트를 로드 중입니다. 잠시만 기다려주세요...",
-        Duration = 3,
+        Title = "Script Loading...",
+        Content = name .. " 소스를 가져오는 중입니다.",
+        Duration = 2,
         Image = 4483345998,
     })
     
-    -- 스크립트 주소에서 소스 코드 가져오기 시도
-    local scriptSource = ""
     local getSuccess, result = pcall(function()
         return game:HttpGet(url)
     end)
     
     if getSuccess and result then
-        -- 가져온 소스 코드를 실행
-        local execSuccess, execError = pcall(function()
-            local func = loadstring(result)
-            if func then
-                -- UI를 먼저 닫고 스크립트 실행 (충돌 방지)
+        local func, err = loadstring(result)
+        if func then
+            Rayfield:Notify({
+                Title = "Success!",
+                Content = name .. " 실행 성공!",
+                Duration = 2,
+                Image = 4483345998,
+            })
+            
+            -- UI 종료 설정이 켜져있을 경우에만 파괴
+            if CloseOnExecute then
+                task.wait(0.5)
                 Rayfield:Destroy()
-                task.wait(0.2)
-                func()
-            else
-                error("Loadstring 실패: 올바른 루아 코드가 아닙니다.")
             end
-        end)
-        
-        if not execSuccess then
-            warn(name .. " 실행 중 에러 발생: " .. tostring(execError))
+            
+            -- 스크립트 실행
+            local execSuccess, execError = pcall(func)
+            if not execSuccess then
+                warn(name .. " 실행 중 런타임 에러: " .. tostring(execError))
+            end
+        else
+            Rayfield:Notify({
+                Title = "Syntax Error",
+                Content = "스크립트 코드에 문법 오류가 있습니다.",
+                Duration = 5,
+            })
+            warn("Loadstring Error: " .. tostring(err))
         end
     else
-        warn(name .. " 소스를 불러오지 못했습니다: " .. url)
         Rayfield:Notify({
             Title = "Network Error",
-            Content = "URL로부터 스크립트를 가져오지 못했습니다.",
+            Content = "URL이 잘못되었거나 연결이 원활하지 않습니다.",
             Duration = 5,
         })
     end
@@ -70,13 +81,23 @@ end
 -- [[ 카테고리 탭 ]]
 local MainTab = Window:CreateTab("Script List", 4483362458)
 
+MainTab:CreateSection("Settings")
+MainTab:CreateToggle({
+    Name = "Execute and Close UI",
+    CurrentValue = true,
+    Flag = "CloseOnExec",
+    Callback = function(Value)
+        CloseOnExecute = Value
+    end,
+})
+
 MainTab:CreateSection("Main Feature")
 
--- [1] Main Rival 스크립트 (사용자님이 요청하신 부드러운 에임봇 포함 주소)
+-- [1] Main Rival 스크립트
 MainTab:CreateButton({
-    Name = "Main Rival (Anti-Spin & Smooth Aim)",
+    Name = "🔥 Main Rival (Anti-Spin & Smooth)",
     Callback = function()
-        ExecuteAndClose("Rival", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main2.lua")
+        ExecuteScript("Main Rival", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main2.lua")
     end,
 })
 
@@ -84,25 +105,25 @@ MainTab:CreateSection("Other Scripts")
 
 -- [2] Aimbot V3 스크립트
 MainTab:CreateButton({
-    Name = "Admin sc",
+    Name = "🎯 Aimbot V3 - Precision Lock",
     Callback = function()
-        ExecuteAndClose("Admin", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
+        ExecuteScript("Aimbot V3", "https://raw.githubusercontent.com/url2") -- 실제 주소로 변경 필요
     end,
 })
 
 -- [3] Speed & Jump Hack 스크립트
 MainTab:CreateButton({
-    Name = "Movement Speed & Jump System",
+    Name = "⚡ Movement System",
     Callback = function()
-        ExecuteAndClose("Speed & Jump Hack", "https://raw.githubusercontent.com/url3")
+        ExecuteScript("Speed & Jump Hack", "https://raw.githubusercontent.com/url3") -- 실제 주소로 변경 필요
     end,
 })
 
 -- [4] Auto Farm System 스크립트
 MainTab:CreateButton({
-    Name = "Universal Auto Farm System",
+    Name = "🚜 Universal Auto Farm",
     Callback = function()
-        ExecuteAndClose("Auto Farm System", "https://raw.githubusercontent.com/url4")
+        ExecuteScript("Auto Farm System", "https://raw.githubusercontent.com/url4") -- 실제 주소로 변경 필요
     end,
 })
 
@@ -110,11 +131,20 @@ MainTab:CreateButton({
 local InfoTab = Window:CreateTab("Information", 4483345998)
 InfoTab:CreateSection("Credits")
 InfoTab:CreateParagraph({Title = "Developer", Content = "RiceSec Premium Team"})
-InfoTab:CreateParagraph({Title = "Support", Content = "Rivals Optimized Edition"})
+InfoTab:CreateParagraph({Title = "Version", Content = "v2.5 Optimized Edition"})
+
+-- 실행 버튼 (UI 수동 종료)
+InfoTab:CreateButton({
+    Name = "Destroy Loader UI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+})
 
 -- 로드 완료 알림
 Rayfield:Notify({
-    Title = "Rice Loader v2.5",
-    Content = "로더가 성공적으로 로드되었습니다.",
-    Duration = 5,
+    Title = "Rice Loader Loaded",
+    Content = "환영합니다! 스크립트를 선택해주세요.",
+    Duration = 3,
+    Image = 4483345998,
 })
