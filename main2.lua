@@ -1,6 +1,6 @@
+-- [[ Rayfield 라이브러리 안전 로드 ]]
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- [[ 서비스 설정 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,8 +12,8 @@ local Camera = workspace.CurrentCamera
 local Config = {
     AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
-    AimRange = 1000,
-    Smoothness = 0.15, -- 영상 29초 스타일의 부드러움 수치
+    AimRange = 2000, -- FOV를 뺐으므로 거리를 넉넉하게 설정
+    Smoothness = 0.15, -- 영상 29초 스타일의 부드러움 (0.1 ~ 0.2 추천)
     
     ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
@@ -24,9 +24,9 @@ local Config = {
 
 -- [[ UI 생성 ]]
 local Window = Rayfield:CreateWindow({
-    Name = "RICE SEC PREMIUM V6 - SMOOTH",
-    LoadingTitle = "RiceSec Hub",
-    LoadingSubtitle = "Smooth & Stable Edition",
+    Name = "RICE SEC V6 - RIVALS STABLE",
+    LoadingTitle = "RiceSec Premium",
+    LoadingSubtitle = "Anti-Error & Smooth Tracking",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -35,12 +35,11 @@ local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483345998)
 
 -- [[ 1. COMBAT 탭 ]]
-CombatTab:CreateSection("Aimbot Master")
+CombatTab:CreateSection("Aimbot Settings")
 
 CombatTab:CreateToggle({
     Name = "Enable Aimbot System",
     CurrentValue = false,
-    Flag = "AimToggle",
     Callback = function(Value) Config.AimbotMaster = Value end,
 })
 
@@ -48,29 +47,16 @@ CombatTab:CreateKeybind({
     Name = "Aimbot Hotkey",
     CurrentKeybind = "E",
     HoldToInteract = false,
-    Flag = "AimBind",
-    Callback = function(Keybind)
-        Config.AimKey = Keybind
-    end,
+    Callback = function(Keybind) Config.AimKey = Keybind end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Smoothness (조준 속도)",
-    Info = "낮을수록 영상처럼 부드럽고 팔 돌아감이 없습니다.",
+    Name = "Smoothness (조준 부드러움)",
+    Info = "낮을수록 영상처럼 부드럽고 팔이 안 꺾입니다.",
     Range = {1, 50},
     Increment = 1,
     CurrentValue = 15,
-    Callback = function(Value) 
-        Config.Smoothness = Value / 100 
-    end,
-})
-
-CombatTab:CreateSlider({
-    Name = "Aimbot Range",
-    Range = {100, 3000},
-    Increment = 100,
-    CurrentValue = 1000,
-    Callback = function(Value) Config.AimRange = Value end,
+    Callback = function(Value) Config.Smoothness = Value / 100 end,
 })
 
 -- [[ 2. VISUALS 탭 ]]
@@ -79,22 +65,20 @@ VisualsTab:CreateSection("ESP & Scanner")
 VisualsTab:CreateToggle({
     Name = "Player Glow (Highlight)",
     CurrentValue = false,
-    Flag = "GlowToggle",
     Callback = function(Value) Config.ESPEnabled = Value end,
 })
 
 VisualsTab:CreateColorPicker({
-    Name = "Glow Color",
+    Name = "ESP Color",
     Color = Color3.fromRGB(175, 25, 255),
     Callback = function(Value) Config.ESPColor = Value end
 })
 
-VisualsTab:CreateSection("Scanner Settings")
+VisualsTab:CreateSection("Scanner Master")
 
 VisualsTab:CreateToggle({
     Name = "Enable Scanner System",
     CurrentValue = false,
-    Flag = "ScanToggle",
     Callback = function(Value) Config.ScannerMaster = Value end,
 })
 
@@ -102,37 +86,59 @@ VisualsTab:CreateKeybind({
     Name = "Scanner Hotkey",
     CurrentKeybind = "V",
     HoldToInteract = false,
-    Flag = "ScanBind",
-    Callback = function(Keybind)
-        Config.ScannerKey = Keybind
-    end,
+    Callback = function(Keybind) Config.ScannerKey = Keybind end,
 })
 
--- [[ 핵심 기능 구현 ]]
+-- [[ 안전한 타겟 찾기 로직 ]]
+local function GetClosestTarget()
+    local target = nil
+    local shortestDist = math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
-local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
-HL_Folder.Name = "RiceHL"
+    -- 내 캐릭터가 살아있는지 확인
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
 
--- 스캐너 빌보드 (에러 방지 강화)
-local function CreateScanner(plr)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+            local head = p.Character.Head
+            local hum = p.Character:FindFirstChild("Humanoid")
+            
+            if hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                -- FOV를 뺐으므로 화면에 보이기만 하면 커서와 가장 가까운 적 선택
+                if onScreen then
+                    local mouseDist = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+                    if mouseDist < shortestDist then
+                        shortestDist = mouseDist
+                        target = head
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- [[ 안전한 스캐너 생성 ]]
+local function SetupScanner(plr)
     if plr == LocalPlayer then return end
     
-    local function setup(char)
-        local head = char:WaitForChild("Head", 10)
+    local function onChar(char)
+        local head = char:WaitForChild("Head", 15)
         if not head then return end
         
-        local bg = head:FindFirstChild("ScannerGui") or Instance.new("BillboardGui", head)
+        local bg = Instance.new("BillboardGui", head)
         bg.Name = "ScannerGui"
-        bg.Size = UDim2.new(6, 0, 2, 0)
+        bg.Size = UDim2.new(5, 0, 2, 0)
         bg.AlwaysOnTop = true
         bg.Enabled = false
         bg.StudsOffset = Vector3.new(0, 3, 0)
-
-        local txt = bg:FindFirstChild("Info") or Instance.new("TextLabel", bg)
-        txt.Name = "Info"
+        
+        local txt = Instance.new("TextLabel", bg)
         txt.Size = UDim2.new(1, 0, 1, 0)
         txt.BackgroundTransparency = 1
-        txt.TextColor3 = Color3.new(1,1,1)
+        txt.TextColor3 = Color3.new(1, 1, 1)
         txt.TextScaled = true
         txt.Font = Enum.Font.GothamBold
 
@@ -142,55 +148,26 @@ local function CreateScanner(plr)
                     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     if myRoot and head then
                         local dist = math.floor((myRoot.Position - head.Position).Magnitude)
-                        txt.Text = string.format("%s [%dM]", plr.DisplayName, dist)
+                        txt.Text = plr.DisplayName .. "\n[" .. dist .. "M]"
                     end
                 end
                 task.wait(0.2)
             end
         end)
     end
-    plr.CharacterAdded:Connect(setup)
-    if plr.Character then setup(plr.Character) end
+    plr.CharacterAdded:Connect(onChar)
+    if plr.Character then onChar(plr.Character) end
 end
 
-for _, p in ipairs(Players:GetPlayers()) do CreateScanner(p) end
-Players.PlayerAdded:Connect(CreateScanner)
-
--- 안전한 타겟 찾기
-local function GetTarget()
-    local target = nil
-    local minMouseDist = math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    
-    local myChar = LocalPlayer.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") then
-            if p.Character.Humanoid.Health > 0 then
-                local head = p.Character.Head
-                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                
-                if onScreen then
-                    local worldDist = (myRoot.Position - head.Position).Magnitude
-                    if worldDist <= Config.AimRange then
-                        local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                        if mouseDist < minMouseDist then
-                            minMouseDist = mouseDist
-                            target = head
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return target
-end
+for _, p in ipairs(Players:GetPlayers()) do SetupScanner(p) end
+Players.PlayerAdded:Connect(SetupScanner)
 
 -- [[ 메인 루프 ]]
+local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
+HL_Folder.Name = "RiceHL"
+
 RunService.RenderStepped:Connect(function()
-    -- ESP 처리
+    -- 1. 하이라이트 (ESP)
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local hl = HL_Folder:FindFirstChild(p.Name) or Instance.new("Highlight", HL_Folder)
@@ -200,18 +177,18 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 에임봇 처리 (영상 스타일 부드러운 Lerp 적용)
+    -- 2. 에임봇 (부드러운 조준 + 팔 돌아감 방지)
     if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
-        local target = GetTarget()
+        local target = GetClosestTarget()
         if target and Camera.CFrame then
-            -- [수정] 0.1 단위로 부드럽게 따라가는 로직
-            -- UpVector(0,1,0) 고정으로 팔 꺾임 원천 차단
+            -- UpVector(0,1,0) 고정으로 팔 꺾임 방지
             local targetCF = CFrame.lookAt(Camera.CFrame.Position, target.Position, Vector3.new(0, 1, 0))
+            -- Lerp를 이용해 0.1 단위로 부드럽게 추격
             Camera.CFrame = Camera.CFrame:Lerp(targetCF, Config.Smoothness)
         end
     end
 
-    -- 스캐너 처리
+    -- 3. 스캐너 토글 제어
     local isScanning = Config.ScannerMaster and UserInputService:IsKeyDown(Config.ScannerKey)
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
@@ -222,7 +199,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "RICE SEC V6 LOADED",
-    Content = "부드러운 에임봇 로직이 적용되었습니다.",
+    Title = "RICE SEC V6 FIXED",
+    Content = "에러 방지 로직이 강화되었습니다.",
     Duration = 5
 })
