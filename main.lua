@@ -84,9 +84,9 @@ MainTab:CreateSection("Other Scripts")
 
 -- [2] Aimbot V3 스크립트
 MainTab:CreateButton({
-    Name = "Aimbot V3 - Precision Lock",
+    Name = "Admin sc",
     Callback = function()
-        ExecuteAndClose("Aimbot V3", "https://raw.githubusercontent.com/url2")
+        ExecuteAndClose("Admin", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
     end,
 })
 
