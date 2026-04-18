@@ -12,7 +12,7 @@ local Config = {
     AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
     AimRange = 1000,
-    Smoothing = 0.1, -- 에임 부드러움 (0.01 ~ 1)
+    Smoothing = 0.1,
     
     ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
@@ -60,7 +60,7 @@ CombatTab:CreateSlider({
     Increment = 1,
     CurrentValue = 10,
     Callback = function(Value) 
-        Config.Smoothing = Value / 100 -- 0.01 ~ 1.0 값으로 변환
+        Config.Smoothing = Value / 100 
     end,
 })
 
@@ -112,42 +112,82 @@ VisualsTab:CreateKeybind({
 local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
 HL_Folder.Name = "RiceHL"
 
--- 스캐너 로직 (기존과 동일)
+-- 스캐너 및 체력바 생성 로직
 local function CreateScanner(plr)
     if plr == LocalPlayer then return end
     local function setup(char)
         local head = char:WaitForChild("Head", 10)
-        if not head then return end
+        local hum = char:WaitForChild("Humanoid", 10)
+        if not head or not hum then return end
+        
+        -- BillboardGui 설정 (멀리서도 잘 보이게 Size 조절)
         local bg = Instance.new("BillboardGui", head)
         bg.Name = "ScannerGui"
-        bg.Size = UDim2.new(6, 0, 4, 0)
+        bg.Size = UDim2.new(5, 0, 1.5, 0) -- 크기 최적화
         bg.AlwaysOnTop = true
         bg.Enabled = false
-        bg.StudsOffset = Vector3.new(0, 3, 0)
-        local frame = Instance.new("Frame", bg)
-        frame.Size = UDim2.new(1, 0, 1, 0)
-        frame.BackgroundTransparency = 1
-        Instance.new("UIListLayout", frame).HorizontalAlignment = Enum.HorizontalAlignment.Center
-        local nLabel = Instance.new("TextLabel", frame)
-        nLabel.Size = UDim2.new(1, 0, 0.3, 0)
-        nLabel.BackgroundTransparency = 0.5
-        nLabel.BackgroundColor3 = Color3.new(0,0,0)
-        nLabel.TextColor3 = Color3.new(1,1,1)
+        bg.MaxDistance = 5000 -- 아주 먼 거리에서도 보이게 설정
+        bg.StudsOffset = Vector3.new(0, 3.5, 0)
+        
+        local container = Instance.new("Frame", bg)
+        container.Size = UDim2.new(1, 0, 1, 0)
+        container.BackgroundTransparency = 1
+        
+        local layout = Instance.new("UIListLayout", container)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Padding = UDim.new(0, 2)
+
+        -- 이름 및 거리 레이블
+        local nLabel = Instance.new("TextLabel", container)
+        nLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nLabel.BackgroundTransparency = 1
+        nLabel.TextColor3 = Color3.new(1, 1, 1)
+        nLabel.TextStrokeTransparency = 0 -- 글자 테두리 추가로 가시성 확보
         nLabel.TextScaled = true
-        Instance.new("UICorner", nLabel)
+        nLabel.Font = Enum.Font.SourceSansBold
+        nLabel.LayoutOrder = 1
+
+        -- 체력바 배경
+        local healthBg = Instance.new("Frame", container)
+        healthBg.Size = UDim2.new(0.8, 0, 0.2, 0)
+        healthBg.BackgroundColor3 = Color3.new(0, 0, 0)
+        healthBg.BackgroundTransparency = 0.3
+        healthBg.BorderSizePixel = 0
+        healthBg.LayoutOrder = 2
+        local corner = Instance.new("UICorner", healthBg)
+        corner.CornerRadius = UDim.new(0, 4)
+
+        -- 실제 체력 표시바
+        local healthFill = Instance.new("Frame", healthBg)
+        healthFill.Size = UDim2.new(1, 0, 1, 0)
+        healthFill.BackgroundColor3 = Color3.new(0, 1, 0)
+        healthFill.BorderSizePixel = 0
+        local corner2 = Instance.new("UICorner", healthFill)
+        corner2.CornerRadius = UDim.new(0, 4)
+
+        -- 업데이트 루프
         task.spawn(function()
-            while char and char.Parent do
+            while char and char.Parent and hum and hum.Health > 0 do
                 if bg.Enabled then
                     local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude)
                     nLabel.Text = string.format("%s [%dM]", plr.DisplayName, dist)
+                    
+                    -- 체력바 업데이트
+                    local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    healthFill.Size = UDim2.new(healthPercent, 0, 1, 0)
+                    -- 체력에 따른 색상 변경 (초록 -> 노랑 -> 빨강)
+                    healthFill.BackgroundColor3 = Color3.fromHSV(healthPercent * 0.35, 0.9, 1)
                 end
-                task.wait(0.2)
+                task.wait(0.1)
             end
+            bg:Destroy()
         end)
     end
     plr.CharacterAdded:Connect(setup)
     if plr.Character then setup(plr.Character) end
 end
+
 for _, p in ipairs(Players:GetPlayers()) do CreateScanner(p) end
 Players.PlayerAdded:Connect(CreateScanner)
 
@@ -190,20 +230,21 @@ RunService.RenderStepped:Connect(function()
             hl.Enabled = Config.ESPEnabled
             hl.FillColor = Config.ESPColor
             hl.OutlineColor = Color3.new(1,1,1)
+            hl.FillTransparency = 0.5
+            hl.OutlineTransparency = 0
         end
     end
 
-    -- 2. 부드러운 에임봇 (Smooth Aim)
+    -- 2. 부드러운 에임봇
     if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
         local target = GetTarget()
         if target then
-            -- 핵심: CFrame.lookAt을 바로 대입하지 않고 Lerp를 사용하여 부드럽게 이동
             local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
             Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.Smoothing)
         end
     end
 
-    -- 3. 스캐너
+    -- 3. 스캐너 (V키 유지 시 가시화)
     local isScanning = Config.ScannerMaster and UserInputService:IsKeyDown(Config.ScannerKey)
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
@@ -215,6 +256,6 @@ end)
 
 Rayfield:Notify({
     Title = "RICE SEC V6",
-    Content = "팔 돌아감 방지를 위해 Smoothness를 조절하세요.",
+    Content = "체력바가 추가되었습니다. V키로 스캔하세요.",
     Duration = 5
 })
