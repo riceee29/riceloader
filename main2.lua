@@ -224,4 +224,5 @@ end)
 Rayfield:Notify({
     Title = "RICE SEC V6 LOADED",
     Content = "부드러운 에임봇 로직이 적용되었습니다.",
-    Duration
+    Duration = 5
+})
