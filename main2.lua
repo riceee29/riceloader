@@ -12,7 +12,8 @@ local Config = {
     AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
     AimRange = 1000,
-    Smoothing = 0.1, -- 에임 부드러움 (0.01 ~ 1)
+    AimFOV = 150, -- 에임봇이 인식할 화면 중앙 범위
+    Smoothing = 0.05, -- 0.01 (매우부드러움) ~ 0.5 (빠름)
     
     ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
@@ -23,9 +24,9 @@ local Config = {
 
 -- [[ UI 생성 ]]
 local Window = Rayfield:CreateWindow({
-    Name = "RICE SEC V6 - RIVALS OPTIMIZED",
-    LoadingTitle = "Rivals Edition",
-    LoadingSubtitle = "Anti-Snap & Smooth Aim",
+    Name = "RICE SEC V6 - RIVALS FIX",
+    LoadingTitle = "Rivals Anti-Spin Edition",
+    LoadingSubtitle = "Smooth Rotation Logic",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -34,10 +35,10 @@ local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483345998)
 
 -- [[ 1. COMBAT 탭 ]]
-CombatTab:CreateSection("Aimbot Master")
+CombatTab:CreateSection("Aimbot Master (Anti-Spin)")
 
 CombatTab:CreateToggle({
-    Name = "Enable Aimbot System",
+    Name = "Enable Aimbot",
     CurrentValue = false,
     Flag = "AimToggle",
     Callback = function(Value) Config.AimbotMaster = Value end,
@@ -55,25 +56,26 @@ CombatTab:CreateKeybind({
 
 CombatTab:CreateSlider({
     Name = "Smoothness (부드러움)",
-    Info = "낮을수록 부드럽고 팔 돌아감이 적습니다.",
-    Range = {1, 100},
+    Info = "낮을수록 팔이 덜 돌아가고 자연스럽습니다. (추천: 5~15)",
+    Range = {1, 50},
     Increment = 1,
     CurrentValue = 10,
     Callback = function(Value) 
-        Config.Smoothing = Value / 100 -- 0.01 ~ 1.0 값으로 변환
+        Config.Smoothing = Value / 200 -- Rivals에 최적화된 부드러움 계산
     end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Aimbot Range",
-    Range = {100, 3000},
-    Increment = 100,
-    CurrentValue = 1000,
-    Callback = function(Value) Config.AimRange = Value end,
+    Name = "Aimbot FOV (시야각)",
+    Info = "화면 중앙 기준 어느 범위까지 자동조준할지 설정합니다.",
+    Range = {50, 800},
+    Increment = 10,
+    CurrentValue = 150,
+    Callback = function(Value) Config.AimFOV = Value end,
 })
 
 -- [[ 2. VISUALS 탭 ]]
-VisualsTab:CreateSection("Glow ESP")
+VisualsTab:CreateSection("Visual Effects")
 
 VisualsTab:CreateToggle({
     Name = "Player Glow (Highlight)",
@@ -88,10 +90,10 @@ VisualsTab:CreateColorPicker({
     Callback = function(Value) Config.ESPColor = Value end
 })
 
-VisualsTab:CreateSection("Scanner Master")
+VisualsTab:CreateSection("Scanner Settings")
 
 VisualsTab:CreateToggle({
-    Name = "Enable Scanner System",
+    Name = "Enable Scanner",
     CurrentValue = false,
     Flag = "ScanToggle",
     Callback = function(Value) Config.ScannerMaster = Value end,
@@ -107,39 +109,37 @@ VisualsTab:CreateKeybind({
     end,
 })
 
--- [[ 로직 파트 ]]
+-- [[ 핵심 기능 구현 ]]
 
 local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
 HL_Folder.Name = "RiceHL"
 
--- 스캐너 로직 (기존과 동일)
+-- 스캐너 (머리 위 정보 표시)
 local function CreateScanner(plr)
     if plr == LocalPlayer then return end
     local function setup(char)
         local head = char:WaitForChild("Head", 10)
         if not head then return end
-        local bg = Instance.new("BillboardGui", head)
+        local bg = head:FindFirstChild("ScannerGui") or Instance.new("BillboardGui", head)
         bg.Name = "ScannerGui"
-        bg.Size = UDim2.new(6, 0, 4, 0)
+        bg.Size = UDim2.new(6, 0, 2, 0)
         bg.AlwaysOnTop = true
         bg.Enabled = false
         bg.StudsOffset = Vector3.new(0, 3, 0)
-        local frame = Instance.new("Frame", bg)
-        frame.Size = UDim2.new(1, 0, 1, 0)
-        frame.BackgroundTransparency = 1
-        Instance.new("UIListLayout", frame).HorizontalAlignment = Enum.HorizontalAlignment.Center
-        local nLabel = Instance.new("TextLabel", frame)
-        nLabel.Size = UDim2.new(1, 0, 0.3, 0)
-        nLabel.BackgroundTransparency = 0.5
-        nLabel.BackgroundColor3 = Color3.new(0,0,0)
-        nLabel.TextColor3 = Color3.new(1,1,1)
-        nLabel.TextScaled = true
-        Instance.new("UICorner", nLabel)
+        
+        local txt = bg:FindFirstChild("Info") or Instance.new("TextLabel", bg)
+        txt.Name = "Info"
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.TextColor3 = Color3.new(1, 1, 1)
+        txt.Font = Enum.Font.GothamBold
+        txt.TextScaled = true
+
         task.spawn(function()
             while char and char.Parent do
                 if bg.Enabled then
                     local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude)
-                    nLabel.Text = string.format("%s [%dM]", plr.DisplayName, dist)
+                    txt.Text = string.format("%s\n[%dM]", plr.DisplayName, dist)
                 end
                 task.wait(0.2)
             end
@@ -151,24 +151,25 @@ end
 for _, p in ipairs(Players:GetPlayers()) do CreateScanner(p) end
 Players.PlayerAdded:Connect(CreateScanner)
 
--- 에임봇 타겟 찾기
-local function GetTarget()
+-- 에임봇 타겟 (FOV 기반)
+local function GetClosestTarget()
     local target = nil
-    local dist = math.huge
-    local mousePos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local shortestDist = math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+            local head = p.Character.Head
             local hum = p.Character:FindFirstChild("Humanoid")
+            
             if hum and hum.Health > 0 then
-                local head = p.Character.Head
                 local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    local worldDist = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
-                    if worldDist <= Config.AimRange then
-                        local screenDist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                        if screenDist < dist then
-                            dist = screenDist
+                    local mouseDist = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+                    if mouseDist < shortestDist and mouseDist <= Config.AimFOV then
+                        local worldDist = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
+                        if worldDist <= Config.AimRange then
+                            shortestDist = mouseDist
                             target = head
                         end
                     end
@@ -181,7 +182,7 @@ end
 
 -- [[ 메인 루프 ]]
 RunService.RenderStepped:Connect(function()
-    -- 1. 하이라이트 ESP
+    -- 1. 하이라이트
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local hl = HL_Folder:FindFirstChild(p.Name) or Instance.new("Highlight", HL_Folder)
@@ -189,17 +190,23 @@ RunService.RenderStepped:Connect(function()
             hl.Adornee = p.Character
             hl.Enabled = Config.ESPEnabled
             hl.FillColor = Config.ESPColor
-            hl.OutlineColor = Color3.new(1,1,1)
+            hl.OutlineColor = Color3.new(1, 1, 1)
         end
     end
 
-    -- 2. 부드러운 에임봇 (Smooth Aim)
+    -- 2. 에임봇 (Rivals 최적화 로직)
     if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
-        local target = GetTarget()
+        local target = GetClosestTarget()
         if target then
-            -- 핵심: CFrame.lookAt을 바로 대입하지 않고 Lerp를 사용하여 부드럽게 이동
-            local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.Smoothing)
+            -- [핵심 수정] CFrame.lookAt의 기울기 버그 방지
+            local targetPos = target.Position
+            local lookAtCFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+            local x, y, z = lookAtCFrame:ToEulerAnglesYXZ()
+            
+            -- Z값(기울기)을 0으로 고정하여 팔 돌아감 방지
+            local smoothedCFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position) * CFrame.fromEulerAnglesYXZ(x, y, 0), Config.Smoothing)
+            
+            Camera.CFrame = smoothedCFrame
         end
     end
 
@@ -214,7 +221,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "RICE  V6",
-    Content = "RIVAL",
+    Title = "RICE SEC V6 - RIVALS FIX",
+    Content = "팔 돌아감 방지 로직이 적용되었습니다.",
     Duration = 5
 })
