@@ -6,151 +6,197 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ 상태 및 키바인드 설정 ]]
-local Toggles = { Scanner = false, Aimbot = false, Highlight = false }
-local Binds = {
-    Scanner = Enum.KeyCode.V,
-    Aimbot = Enum.KeyCode.E,
-    Menu = Enum.KeyCode.RightShift
+-- [[ 전역 설정 값 ]]
+local Config = {
+    Toggles = { Scanner = false, Aimbot = false, Highlight = false },
+    Binds = { Scanner = Enum.KeyCode.V, Aimbot = Enum.KeyCode.E, Menu = Enum.KeyCode.RightShift },
+    Colors = { ESP = Color3.fromRGB(175, 25, 255), UI = Color3.fromRGB(100, 100, 255) },
+    UI_Open = true,
+    Listening = nil -- 현재 키 바인딩 대기 중인 기능
 }
-local UI_OPEN = true
-local ListeningForBind = nil -- 현재 어떤 키를 바꾸고 있는지 저장
 
--- [[ UI 생성 ]]
+-- [[ 하이라이트 저장소 ]]
+local HL_Folder = CoreGui:FindFirstChild("RiceHL_Storage") or Instance.new("Folder", CoreGui)
+HL_Folder.Name = "RiceHL_Storage"
+
+-- [[ 고퀄리티 UI 생성 ]]
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
-ScreenGui.Name = "RiceSec_KeybindSystem"
+ScreenGui.Name = "RiceSec_Premium_V3"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.Size = UDim2.new(0, 240, 0, 300)
+MainFrame.Size = UDim2.new(0, 260, 0, 340)
 MainFrame.Position = UDim2.new(0.5, 0, 0.45, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
-Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(100, 100, 255)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+-- 테두리 빛 효과
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Color = Config.Colors.UI
+Stroke.Thickness = 2
+Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.Text = "RICE SEC CONFIG"
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "RICE SEC PREMIUM"
 Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
+Title.TextSize = 16
+Instance.new("UICorner", Title)
 
 local Container = Instance.new("Frame", MainFrame)
-Container.Size = UDim2.new(1, 0, 1, -45)
-Container.Position = UDim2.new(0, 0, 0, 45)
+Container.Size = UDim2.new(1, 0, 1, -55)
+Container.Position = UDim2.new(0, 0, 0, 55)
 Container.BackgroundTransparency = 1
 local Layout = Instance.new("UIListLayout", Container)
-Layout.Padding = UDim.new(0, 8)
+Layout.Padding = UDim.new(0, 10)
 Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-Layout.VerticalAlignment = Enum.VerticalAlignment.Center
 
--- [[ 버튼 및 키바인드 UI 생성 함수 ]]
-local function CreateFeatureRow(name, featureKey)
-    local Frame = Instance.new("Frame", Container)
-    Frame.Size = UDim2.new(0.9, 0, 0, 45)
-    Frame.BackgroundTransparency = 1
-    
-    -- 활성화 토글 버튼
-    local ToggleBtn = Instance.new("TextButton", Frame)
-    ToggleBtn.Size = UDim2.new(0.65, 0, 1, 0)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    ToggleBtn.Text = "○ " .. name
-    ToggleBtn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    ToggleBtn.Font = Enum.Font.GothamMedium
-    ToggleBtn.TextSize = 12
-    Instance.new("UICorner", ToggleBtn)
-    
-    -- 키바인드 변경 버튼
-    local BindBtn = Instance.new("TextButton", Frame)
-    BindBtn.Size = UDim2.new(0.3, 0, 1, 0)
-    BindBtn.Position = UDim2.new(0.7, 0, 0, 0)
-    BindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    BindBtn.Text = Binds[featureKey].Name
-    BindBtn.TextColor3 = Color3.new(1, 1, 1)
-    BindBtn.Font = Enum.Font.Code
-    BindBtn.TextSize = 12
-    Instance.new("UICorner", BindBtn)
+-- [[ 유틸리티: 버튼 생성 함수 ]]
+local function CreateMenuRow(name, key)
+    local Row = Instance.new("Frame", Container)
+    Row.Size = UDim2.new(0.9, 0, 0, 45)
+    Row.BackgroundTransparency = 1
 
-    -- 토글 로직
-    ToggleBtn.MouseButton1Click:Connect(function()
-        Toggles[featureKey] = not Toggles[featureKey]
-        ToggleBtn.Text = (Toggles[featureKey] and "● " or "○ ") .. name
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.3), {TextColor3 = Toggles[featureKey] and Color3.new(0, 1, 0.5) or Color3.new(0.8,0.8,0.8)}):Play()
-        if featureKey == "Highlight" then
-            for _, v in ipairs(CoreGui:FindFirstChild("RiceHL_Storage"):GetChildren()) do v.Enabled = Toggles.Highlight end
+    local Toggle = Instance.new("TextButton", Row)
+    Toggle.Size = UDim2.new(0.65, 0, 1, 0)
+    Toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    Toggle.Text = "○ " .. name
+    Toggle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Toggle.Font = Enum.Font.GothamMedium
+    Toggle.TextSize = 12
+    Instance.new("UICorner", Toggle)
+
+    local Bind = Instance.new("TextButton", Row)
+    Bind.Size = UDim2.new(0.3, 0, 1, 0)
+    Bind.Position = UDim2.new(0.7, 0, 0, 0)
+    Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    Bind.Text = Config.Binds[key] and Config.Binds[key].Name or "None"
+    Bind.TextColor3 = Config.Colors.UI
+    Bind.Font = Enum.Font.Code
+    Bind.TextSize = 12
+    Instance.new("UICorner", Bind)
+
+    -- 토글 이벤트
+    Toggle.MouseButton1Click:Connect(function()
+        Config.Toggles[key] = not Config.Toggles[key]
+        Toggle.Text = (Config.Toggles[key] and "● " or "○ ") .. name
+        TweenService:Create(Toggle, TweenInfo.new(0.3), {TextColor3 = Config.Toggles[key] and Color3.new(0, 1, 0.5) or Color3.fromRGB(200, 200, 200)}):Play()
+        
+        if key == "Highlight" then
+            for _, v in ipairs(HL_Folder:GetChildren()) do v.Enabled = Config.Toggles.Highlight end
         end
     end)
 
-    -- 키바인드 변경 로직
-    BindBtn.MouseButton1Click:Connect(function()
-        ListeningForBind = featureKey
-        BindBtn.Text = "..."
-        BindBtn.BackgroundColor3 = Color3.fromRGB(100, 80, 20)
+    -- 키바인드 설정 이벤트
+    Bind.MouseButton1Click:Connect(function()
+        Config.Listening = key
+        Bind.Text = "..."
+        Bind.BackgroundColor3 = Color3.fromRGB(60, 50, 20)
     end)
 
-    return {Toggle = ToggleBtn, Bind = BindBtn}
+    return {Toggle = Toggle, Bind = Bind}
 end
 
-local UI_Scanner = CreateFeatureRow("SCANNER", "Scanner")
-local UI_Aimbot = CreateFeatureRow("AIMBOT", "Aimbot")
-local UI_Highlight = CreateFeatureRow("HIGHLIGHT", "Highlight")
+-- 색상 변경 로직 (ESP 색상 입력)
+local function CreateColorInput()
+    local Row = Instance.new("Frame", Container)
+    Row.Size = UDim2.new(0.9, 0, 0, 45)
+    Row.BackgroundTransparency = 1
+    
+    local Label = Instance.new("TextLabel", Row)
+    Label.Size = UDim2.new(0.4, 0, 1, 0)
+    Label.Text = "ESP COLOR (RGB)"
+    Label.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 10
 
--- [[ 키 입력 감지 로직 ]]
+    local Input = Instance.new("TextBox", Row)
+    Input.Size = UDim2.new(0.55, 0, 1, 0)
+    Input.Position = UDim2.new(0.45, 0, 0, 0)
+    Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    Input.Text = "175, 25, 255"
+    Input.TextColor3 = Color3.new(1,1,1)
+    Input.Font = Enum.Font.Code
+    Input.TextSize = 12
+    Instance.new("UICorner", Input)
+
+    Input.FocusLost:Connect(function()
+        local r, g, b = Input.Text:match("(%d+),%s*(%d+),%s*(%d+)")
+        if r and g and b then
+            Config.Colors.ESP = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+            for _, v in ipairs(HL_Folder:GetChildren()) do v.FillColor = Config.Colors.ESP end
+        end
+    end)
+end
+
+local UI_Scanner = CreateMenuRow("SCANNER", "Scanner")
+local UI_Aimbot = CreateMenuRow("AIMBOT", "Aimbot")
+local UI_Highlight = CreateMenuRow("HIGHLIGHT", "Highlight")
+CreateColorInput()
+
+-- [[ 핵심 기능 로직 ]]
+
+-- 하이라이트 ESP
+local function ApplyHighlight(plr)
+    if plr == LocalPlayer then return end
+    local hl = Instance.new("Highlight", HL_Folder)
+    hl.Name = plr.Name
+    hl.FillColor = Config.Colors.ESP
+    hl.Enabled = Config.Toggles.Highlight
+    local function update(char) hl.Adornee = char end
+    if plr.Character then update(plr.Character) end
+    plr.CharacterAdded:Connect(update)
+end
+
+-- 키 입력 감지 (토글 & 바인딩)
 UserInputService.InputBegan:Connect(function(io, gpe)
-    -- 1. 키바인드 설정 중일 때
-    if ListeningForBind then
+    if Config.Listening then
         if io.UserInputType == Enum.UserInputType.Keyboard then
-            local key = io.KeyCode
-            Binds[ListeningForBind] = key
-            
-            -- UI 갱신
-            if ListeningForBind == "Scanner" then UI_Scanner.Bind.Text = key.Name
-            elseif ListeningForBind == "Aimbot" then UI_Aimbot.Bind.Text = key.Name end
-            
-            UI_Scanner.Bind.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-            UI_Aimbot.Bind.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-            ListeningForBind = nil
+            Config.Binds[Config.Listening] = io.KeyCode
+            if Config.Listening == "Scanner" then UI_Scanner.Bind.Text = io.KeyCode.Name
+            elseif Config.Listening == "Aimbot" then UI_Aimbot.Bind.Text = io.KeyCode.Name end
+            UI_Scanner.Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            UI_Aimbot.Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            Config.Listening = nil
         end
         return
     end
 
     if gpe then return end
-
-    -- 2. 메뉴 열기/닫기 (오른쪽 쉬프트 고정)
-    if io.KeyCode == Binds.Menu then
-        UI_OPEN = not UI_OPEN
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = UI_OPEN and UDim2.new(0, 240, 0, 300) or UDim2.new(0, 0, 0, 0)}):Play()
+    if io.KeyCode == Config.Binds.Menu then
+        Config.UI_Open = not Config.UI_Open
+        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = Config.UI_Open and UDim2.new(0, 260, 0, 340) or UDim2.new(0,0,0,0)}):Play()
     end
 end)
 
--- [[ 실제 기능 작동 루프 ]]
-local vHeld, eHeld = false, false
-
+-- 루프 연산 (Aimbot & Scanner)
 RunService.RenderStepped:Connect(function()
-    vHeld = UserInputService:IsKeyDown(Binds.Scanner)
-    eHeld = UserInputService:IsKeyDown(Binds.Aimbot)
+    local scannerDown = UserInputService:IsKeyDown(Config.Binds.Scanner)
+    local aimbotDown = UserInputService:IsKeyDown(Config.Binds.Aimbot)
 
-    -- Scanner 작동
+    -- Scanner ESP 가시성 업데이트
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
             local sg = p.Character.Head:FindFirstChild("ScannerGui")
-            if sg then sg.Enabled = (Toggles.Scanner and vHeld) end
+            if sg then sg.Enabled = (Config.Toggles.Scanner and scannerDown) end
         end
     end
 
-    -- Aimbot 작동
-    if Toggles.Aimbot and eHeld then
+    -- Aimbot 로직
+    if Config.Toggles.Aimbot and aimbotDown then
         local target = nil
-        local minDist = math.huge
+        local shortest = math.huge
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
                 local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
                 if onScreen then
-                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                    if mag < minDist then minDist = mag target = p.Character.Head end
+                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if dist < shortest then shortest = dist target = p.Character.Head end
                 end
             end
         end
@@ -158,5 +204,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- (나머지 ESP 및 초기화 로직은 이전과 동일하게 유지됩니다)
--- 하이라이트/스캐너 초기 세팅은 생략(위 코드와 동일)
+-- 초기화
+for _, p in ipairs(Players:GetPlayers()) do ApplyHighlight(p) end
+Players.PlayerAdded:Connect(ApplyHighlight)
