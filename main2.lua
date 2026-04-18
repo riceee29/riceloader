@@ -214,7 +214,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "RICE SEC V6",
-    Content = "팔 돌아감 방지를 위해 Smoothness를 조절하세요.",
+    Title = "RICE  V6",
+    Content = "RIVAL",
     Duration = 5
 })
