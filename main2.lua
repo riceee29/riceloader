@@ -7,26 +7,24 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ 전역 설정 ]]
+-- [[ 설정 데이터 ]]
 local Config = {
-    AimbotEnabled = false,
+    AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
-    Smoothness = 0.1,
-    AimFOV = 200,
-    AimRange = 1000,
+    AimSpeed = 0.15, -- 0.1씩 빠르게 움직이는 단계 값
     
-    ScannerEnabled = false,
+    ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
     
     ESPEnabled = false,
     ESPColor = Color3.fromRGB(175, 25, 255)
 }
 
--- [[ UI 창 생성 ]]
+-- [[ UI 생성 ]]
 local Window = Rayfield:CreateWindow({
-    Name = "RICE SEC V6 - RIVALS FINAL",
-    LoadingTitle = "Rivals Precision System",
-    LoadingSubtitle = "Anti-Twist & High Performance",
+    Name = "RICE SEC V6 - RIVALS SMOOTH SPEED",
+    LoadingTitle = "Rivals Anti-Snap Edition",
+    LoadingSubtitle = "Fast but Smooth Tracking",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -35,69 +33,58 @@ local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483345998)
 
 -- [[ 1. Combat 탭 ]]
-CombatTab:CreateSection("Aimbot Master")
+CombatTab:CreateSection("Precision Aimbot (No FOV)")
 
 CombatTab:CreateToggle({
     Name = "Enable Aimbot",
     CurrentValue = false,
-    Callback = function(Value) Config.AimbotEnabled = Value end,
+    Callback = function(Value) Config.AimbotMaster = Value end,
 })
 
 CombatTab:CreateKeybind({
-    Name = "Aimbot Hold Key",
+    Name = "Aimbot Key",
     CurrentKeybind = "E",
     HoldToInteract = false,
-    Callback = function(Keybind)
-        Config.AimKey = typeof(Keybind) == "EnumItem" and Keybind or Enum.KeyCode[Keybind]
-    end,
+    Callback = function(Keybind) Config.AimKey = Keybind end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Smoothness (부드러움)",
+    Name = "Aim Speed (추적 속도)",
+    Info = "0.1에 가까울수록 팔이 안 꺾이고 부드럽게 빠릅니다.",
     Range = {1, 50},
     Increment = 1,
-    CurrentValue = 10,
-    Callback = function(Value) Config.Smoothness = Value / 100 end,
-})
-
-CombatTab:CreateSlider({
-    Name = "FOV Radius",
-    Range = {50, 1000},
-    Increment = 10,
-    CurrentValue = 200,
-    Callback = function(Value) Config.AimFOV = Value end,
+    CurrentValue = 15,
+    Callback = function(Value) Config.AimSpeed = Value / 100 end,
 })
 
 -- [[ 2. Visuals 탭 ]]
-VisualsTab:CreateSection("ESP Settings")
+VisualsTab:CreateSection("Visuals & Scanner")
 
 VisualsTab:CreateToggle({
-    Name = "Player Highlight",
+    Name = "Highlight ESP",
     CurrentValue = false,
     Callback = function(Value) Config.ESPEnabled = Value end,
 })
 
 VisualsTab:CreateColorPicker({
-    Name = "Glow Color",
+    Name = "ESP Color",
     Color = Color3.fromRGB(175, 25, 255),
     Callback = function(Value) Config.ESPColor = Value end
 })
 
-VisualsTab:CreateSection("Scanner Settings")
+VisualsTab:CreateSection("Scanner Master")
 
 VisualsTab:CreateToggle({
     Name = "Enable Scanner",
     CurrentValue = false,
-    Callback = function(Value) Config.ScannerEnabled = Value end,
+    Callback = function(Value) Config.ScannerMaster = Value end,
 })
 
 VisualsTab:CreateKeybind({
-    Name = "Scanner Hold Key",
+    Name = "Scanner Key",
     CurrentKeybind = "V",
     HoldToInteract = false,
-    Callback = function(Keybind)
-        Config.ScannerKey = typeof(Keybind) == "EnumItem" and Keybind or Enum.KeyCode[Keybind]
-    end,
+    Callback = function(Keybind) Config.ScannerKey = Keybind end,
 })
 
 -- [[ 핵심 기능 구현 ]]
@@ -105,14 +92,14 @@ VisualsTab:CreateKeybind({
 local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
 HL_Folder.Name = "RiceHL"
 
--- 스캐너 빌보드 GUI 관리
-local function ManageScanner(plr)
+-- 스캐너 (머리 위 정보 표시)
+local function AddScanner(plr)
     if plr == LocalPlayer then return end
-    plr.CharacterAdded:Connect(function(char)
+    local function onChar(char)
         local head = char:WaitForChild("Head", 10)
         local bg = Instance.new("BillboardGui", head)
         bg.Name = "ScannerGui"
-        bg.Size = UDim2.new(5, 0, 2, 0)
+        bg.Size = UDim2.new(4, 0, 1.5, 0)
         bg.AlwaysOnTop = true
         bg.Enabled = false
         bg.StudsOffset = Vector3.new(0, 3, 0)
@@ -128,70 +115,71 @@ local function ManageScanner(plr)
             while char and char.Parent do
                 if bg.Enabled then
                     local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude)
-                    txt.Text = plr.DisplayName .. " [" .. dist .. "M]"
+                    txt.Text = plr.DisplayName .. " [" .. dist .. "m]"
                 end
                 task.wait(0.2)
             end
         end)
-    end)
+    end
+    plr.CharacterAdded:Connect(onChar)
+    if plr.Character then onChar(plr.Character) end
 end
-for _, p in ipairs(Players:GetPlayers()) do ManageScanner(p) end
-Players.PlayerAdded:Connect(ManageScanner)
+for _, p in ipairs(Players:GetPlayers()) do AddScanner(p) end
+Players.PlayerAdded:Connect(AddScanner)
 
--- 가장 가까운 타겟 찾기
-local function GetClosestTarget()
-    local target = nil
-    local minMouseDist = Config.AimFOV
+-- 가장 가까운 적 찾기 (FOV 무시)
+local function GetTarget()
+    local best = nil
+    local minMouseDist = math.huge
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            local head = p.Character.Head
             local hum = p.Character:FindFirstChild("Humanoid")
-            
             if hum and hum.Health > 0 then
+                local head = p.Character.Head
                 local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
                     local mouseDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if mouseDist < minMouseDist then
-                        local worldDist = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
-                        if worldDist <= Config.AimRange then
-                            minMouseDist = mouseDist
-                            target = head
-                        end
+                        minMouseDist = mouseDist
+                        best = head
                     end
                 end
             end
         end
     end
-    return target
+    return best
 end
 
 -- [[ 메인 루프 ]]
 RunService.RenderStepped:Connect(function()
-    -- 1. 하이라이트 (ESP)
+    -- 1. 하이라이트 ESP
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local hl = HL_Folder:FindFirstChild(p.Name) or Instance.new("Highlight", HL_Folder)
             hl.Adornee = p.Character
             hl.Enabled = Config.ESPEnabled
             hl.FillColor = Config.ESPColor
-            hl.OutlineColor = Color3.new(1,1,1)
+            hl.OutlineColor = Color3.new(1, 1, 1)
         end
     end
 
-    -- 2. 에임봇 (Rivals 팔 안 돌아가는 로직)
-    if Config.AimbotEnabled and UserInputService:IsKeyDown(Config.AimKey) then
-        local target = GetClosestTarget()
+    -- 2. 단계적 부드러운 에임봇 (Rivals 최적화)
+    if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
+        local target = GetTarget()
         if target then
-            -- [핵심] Vector3.new(0,1,0)을 사용하여 카메라의 기울어짐(팔 꺾임)을 원천 방지
-            local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position, Vector3.new(0, 1, 0))
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.Smoothness)
+            -- 순간 이동이 아닌, 현재 보는 곳에서 목표까지 Lerp(보간)를 통해 미세하게 쪼개서 이동
+            -- UpVector를 (0,1,0)으로 고정하여 팔 꼬임을 완벽 차단
+            local targetCF = CFrame.lookAt(Camera.CFrame.Position, target.Position, Vector3.new(0, 1, 0))
+            
+            -- 조준 속도를 Config.AimSpeed(약 0.1~0.2)로 설정하여 매 프레임마다 목표 방향으로 10~20%씩 이동
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, Config.AimSpeed)
         end
     end
 
-    -- 3. 스캐너 가시성
-    local isScanning = Config.ScannerEnabled and UserInputService:IsKeyDown(Config.ScannerKey)
+    -- 3. 스캐너
+    local isScanning = Config.ScannerMaster and UserInputService:IsKeyDown(Config.ScannerKey)
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
             local gui = p.Character.Head:FindFirstChild("ScannerGui")
@@ -201,7 +189,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "RICE SEC V6",
-    Content = "Rivals 최적화 완료! Master 스위치를 켜주세요.",
+    Title = "RICE SEC V6 LOADED",
+    Content = "부드럽고 빠른 추적 로직이 적용되었습니다.",
     Duration = 5
 })
