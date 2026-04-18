@@ -137,7 +137,7 @@ local function addScript(name, url)
 end
 
 -- 스크립트 목록 추가
-addScript("Main ESP Script", "https://raw.githubusercontent.com/url1")
+addScript("Main ESP Script", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main2.lua?token=GHSAT0AAAAAAD2DMG6ME53SBJZOCNQFTLXQ2PDBYGQ")
 addScript("Aimbot V3", "https://raw.githubusercontent.com/url2")
 addScript("Speed & Jump Hack", "https://raw.githubusercontent.com/url3")
 addScript("Auto Farm System", "https://raw.githubusercontent.com/url4")
