@@ -6,57 +6,49 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ 상태 관리 변수 ]]
-local Toggles = {
-    Scanner = false,
-    Aimbot = false,
-    Highlight = false
-}
+-- [[ 설정 및 상태 ]]
+local Toggles = { Scanner = false, Aimbot = false, Highlight = false }
 local UI_VISIBLE = true
-local BIND_KEY_SCANNER = Enum.KeyCode.V
-local BIND_KEY_AIMBOT = Enum.KeyCode.E
+local BIND_SCANNER = Enum.KeyCode.V
+local BIND_AIMBOT = Enum.KeyCode.E
 local MENU_KEY = Enum.KeyCode.RightShift
 
--- [[ GUI 생성 ]]
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RiceSec_Integrated"
-ScreenGui.Parent = CoreGui
-ScreenGui.ResetOnSpawn = false
+-- [[ UI 생성 ]]
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "RiceSec_Fixed"
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 200, 0, 250)
-MainFrame.Position = UDim2.new(0.5, -100, 0.4, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 200, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -100, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame)
 
-local UICorner = Instance.new("UICorner", MainFrame)
-local Title = Instance.new("TextLabel")
+local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "RICE SEC MULTI"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.Text = "RICE SEC V2"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-Title.Parent = MainFrame
+Title.TextSize = 16
 Instance.new("UICorner", Title)
 
 local Layout = Instance.new("UIListLayout", MainFrame)
-Layout.Padding = UDim.new(0, 10)
+Layout.Padding = UDim.new(0, 8)
 Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 Layout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- 버튼 생성 함수
-local function CreateButton(name, layoutOrder)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+-- 버튼 생성 함수 (오류 방지 위해 nil 체크 포함)
+local function CreateButton(name, order)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Name = name .. "Btn"
+    btn.Size = UDim2.new(0.9, 0, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     btn.Text = name .. ": OFF"
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextColor3 = Color3.new(0.8, 0.8, 0.8)
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
-    btn.LayoutOrder = layoutOrder
-    btn.Parent = MainFrame
+    btn.LayoutOrder = order
     Instance.new("UICorner", btn)
     return btn
 end
@@ -65,156 +57,134 @@ local btnScanner = CreateButton("Scanner (V)", 1)
 local btnAimbot = CreateButton("Aimbot (E)", 2)
 local btnHighlight = CreateButton("Highlight", 3)
 
--- [[ 1. 스캐너 기능 로직 ]]
-local function createScannerGui(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(character)
-        local head = character:WaitForChild("Head", 15)
-        local billboard = Instance.new("BillboardGui", head)
-        billboard.Name = "ScannerGui"
-        billboard.Size = UDim2.new(10, 0, 6, 0)
-        billboard.StudsOffset = Vector3.new(0, 5, 0)
-        billboard.AlwaysOnTop = true
-        billboard.Enabled = false
+-- [[ 기능 로직 ]]
 
-        local infoList = Instance.new("Frame", billboard)
-        infoList.Name = "InfoList"
-        infoList.Size = UDim2.new(1, 0, 1, 0)
-        infoList.BackgroundTransparency = 1
-        Instance.new("UIListLayout", infoList).HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- 1. 스캐너 (안전한 경로 탐색)
+local function setupScanner(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(char)
+        local head = char:WaitForChild("Head", 10)
+        if not head then return end
+        
+        local bgui = Instance.new("BillboardGui", head)
+        bgui.Name = "ScannerGui"
+        bgui.Size = UDim2.new(8, 0, 5, 0)
+        bgui.StudsOffset = Vector3.new(0, 4, 0)
+        bgui.AlwaysOnTop = true
+        bgui.Enabled = false
+
+        local list = Instance.new("Frame", bgui)
+        list.Size = UDim2.new(1, 0, 1, 0)
+        list.BackgroundTransparency = 1
+        local l_layout = Instance.new("UIListLayout", list)
+        l_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
         task.spawn(function()
-            while character and character.Parent do
-                if billboard.Enabled then
-                    for _, v in ipairs(infoList:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
-                    local pg = player:FindFirstChild("PlayerGui")
-                    local targetRoot = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("MainFrame") and pg.MainGui.MainFrame:FindFirstChild("ItemInterfaces")
+            while char and char.Parent do
+                if bgui.Enabled then
+                    for _, v in ipairs(list:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
                     
-                    if targetRoot then
-                        for _, item in ipairs(targetRoot:GetChildren()) do
-                            local val = item:IsA("TextLabel") and item.Text or item.Name
-                            local lbl = Instance.new("TextLabel", infoList)
-                            lbl.Size = UDim2.new(0.7, 0, 0.12, 0)
-                            lbl.Text = "» " .. val .. " «"
-                            lbl.TextColor3 = Color3.new(1,1,1)
-                            lbl.BackgroundTransparency = 0.5
-                            lbl.BackgroundColor3 = Color3.new(0,0,0)
-                            lbl.TextScaled = true
-                            Instance.new("UICorner", lbl)
+                    pcall(function() -- 타겟 GUI 접근 시 에러 방지
+                        local pg = player:FindFirstChild("PlayerGui")
+                        local target = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("MainFrame") and pg.MainGui.MainFrame:FindFirstChild("ItemInterfaces")
+                        if target then
+                            for _, item in ipairs(target:GetChildren()) do
+                                local txt = Instance.new("TextLabel", list)
+                                txt.Size = UDim2.new(0.8, 0, 0.2, 0)
+                                txt.Text = item.Name
+                                txt.BackgroundColor3 = Color3.new(0,0,0)
+                                txt.BackgroundTransparency = 0.6
+                                txt.TextColor3 = Color3.new(1,1,1)
+                                txt.TextScaled = true
+                                Instance.new("UICorner", txt)
+                            end
                         end
-                    end
+                    end)
                 end
-                task.wait(1)
+                task.wait(1.5)
             end
         end)
     end)
 end
 
--- [[ 2. 에임봇 기능 로직 ]]
-local function getClosestPlayerToCursor()
-    local nearestHead = nil
-    local shortestMouseDistance = math.huge
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+-- 2. 하이라이트 (저장소 중복 생성 방지)
+local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
+HL_Folder.Name = "RiceHL"
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local head = player.Character:FindFirstChild("Head")
-            local hum = player.Character:FindFirstChild("Humanoid")
-            if head and hum and hum.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local mouseDistance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                    if mouseDistance < shortestMouseDistance then
-                        shortestMouseDistance = mouseDistance
-                        nearestHead = head
-                    end
-                end
-            end
-        end
-    end
-    return nearestHead
-end
-
--- [[ 3. 하이라이트 기능 로직 ]]
-local HighlightStorage = Instance.new("Folder", CoreGui)
-HighlightStorage.Name = "RiceHighlight_Storage"
-
-local function ApplyHighlight(plr)
+local function doHighlight(plr)
     if plr == LocalPlayer then return end
-    local hl = Instance.new("Highlight")
-    hl.Name = plr.Name
-    hl.FillColor = Color3.fromRGB(0, 120, 255)
-    hl.OutlineColor = Color3.new(1,1,1)
+    local hl = Instance.new("Highlight", HL_Folder)
+    hl.FillColor = Color3.fromRGB(0, 150, 255)
     hl.Enabled = Toggles.Highlight
-    hl.Parent = HighlightStorage
     
-    local function update(char) hl.Adornee = char end
-    if plr.Character then update(plr.Character) end
-    plr.CharacterAdded:Connect(update)
+    local function setChar(c) hl.Adornee = c end
+    if plr.Character then setChar(plr.Character) end
+    plr.CharacterAdded:Connect(setChar)
 end
 
--- [[ 토글 및 이벤트 연결 ]]
-local function updateButtons()
+-- [[ 이벤트 핸들링 ]]
+local function updateUI()
     btnScanner.Text = "Scanner (V): " .. (Toggles.Scanner and "ON" or "OFF")
-    btnScanner.BackgroundColor3 = Toggles.Scanner and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    btnScanner.BackgroundColor3 = Toggles.Scanner and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
     
     btnAimbot.Text = "Aimbot (E): " .. (Toggles.Aimbot and "ON" or "OFF")
-    btnAimbot.BackgroundColor3 = Toggles.Aimbot and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    btnAimbot.BackgroundColor3 = Toggles.Aimbot and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
     
     btnHighlight.Text = "Highlight: " .. (Toggles.Highlight and "ON" or "OFF")
-    btnHighlight.BackgroundColor3 = Toggles.Highlight and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+    btnHighlight.BackgroundColor3 = Toggles.Highlight and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
     
-    for _, v in ipairs(HighlightStorage:GetChildren()) do v.Enabled = Toggles.Highlight end
+    for _, h in ipairs(HL_Folder:GetChildren()) do h.Enabled = Toggles.Highlight end
 end
 
-btnScanner.MouseButton1Click:Connect(function() Toggles.Scanner = not Toggles.Scanner updateButtons() end)
-btnAimbot.MouseButton1Click:Connect(function() Toggles.Aimbot = not Toggles.Aimbot updateButtons() end)
-btnHighlight.MouseButton1Click:Connect(function() Toggles.Highlight = not Toggles.Highlight updateButtons() end)
+btnScanner.MouseButton1Click:Connect(function() Toggles.Scanner = not Toggles.Scanner updateUI() end)
+btnAimbot.MouseButton1Click:Connect(function() Toggles.Aimbot = not Toggles.Aimbot updateUI() end)
+btnHighlight.MouseButton1Click:Connect(function() Toggles.Highlight = not Toggles.Highlight updateUI() end)
 
--- 입력 처리 (V: 스캔, E: 에임봇, R-Shift: UI)
-local isVDown, isEDown = false, false
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == MENU_KEY then
+-- 입력 감지
+local vHeld, eHeld = false, false
+UserInputService.InputBegan:Connect(function(io, g)
+    if g then return end
+    if io.KeyCode == MENU_KEY then
         UI_VISIBLE = not UI_VISIBLE
         MainFrame.Visible = UI_VISIBLE
-    elseif input.KeyCode == BIND_KEY_SCANNER then
-        isVDown = true
-    elseif input.KeyCode == BIND_KEY_AIMBOT then
-        isEDown = true
-    end
+    elseif io.KeyCode == BIND_SCANNER then vHeld = true
+    elseif io.KeyCode == BIND_AIMBOT then eHeld = true end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == BIND_KEY_SCANNER then isVDown = false
-    elseif input.KeyCode == BIND_KEY_AIMBOT then isEDown = false end
+UserInputService.InputEnded:Connect(function(io)
+    if io.KeyCode == BIND_SCANNER then vHeld = false
+    elseif io.KeyCode == BIND_AIMBOT then eHeld = false end
 end)
 
--- 프레임마다 실행 (에임봇 및 스캐너 가시성)
+-- 실행 루프
 RunService.RenderStepped:Connect(function()
-    -- 스캐너 가시성 업데이트
+    -- 스캐너 온오프
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
-            local gui = p.Character.Head:FindFirstChild("ScannerGui")
-            if gui then gui.Enabled = Toggles.Scanner and isVDown end
+            local g = p.Character.Head:FindFirstChild("ScannerGui")
+            if g then g.Enabled = (Toggles.Scanner and vHeld) end
         end
     end
     
     -- 에임봇
-    if Toggles.Aimbot and isEDown then
-        local target = getClosestPlayerToCursor()
+    if Toggles.Aimbot and eHeld then
+        local target = nil
+        local dist = math.huge
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
+                if onScreen then
+                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if mag < dist then dist = mag target = p.Character.Head end
+                end
+            end
+        end
         if target then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
         end
     end
 end)
 
--- 초기화 실행
-for _, p in ipairs(Players:GetPlayers()) do 
-    createScannerGui(p)
-    ApplyHighlight(p)
-end
-Players.PlayerAdded:Connect(function(p)
-    createScannerGui(p)
-    ApplyHighlight(p)
-end)
+-- 초기 실행
+for _, p in ipairs(Players:GetPlayers()) do setupScanner(p) doHighlight(p) end
+Players.PlayerAdded:Connect(function(p) setupScanner(p) doHighlight(p) end)
