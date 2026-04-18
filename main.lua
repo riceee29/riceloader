@@ -106,9 +106,9 @@ MainTab:CreateButton({
 
 -- [3] 대체용 빈 스크립트 예시 (작동 확인용)
 MainTab:CreateButton({
-    Name = "⚡ Dex Explorer (Test)",
+    Name = "⚡ Fly tool (Test)",
     Callback = function()
-        ExecuteScript("Dex", "https://raw.githubusercontent.com/infyiff/backup/main/dex.lua")
+        ExecuteScript("Fly tool", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main3.lua")
     end,
 })
 
