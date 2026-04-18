@@ -1,6 +1,5 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- [[ 서비스 설정 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,25 +9,23 @@ local Camera = workspace.CurrentCamera
 
 -- [[ 설정 데이터 ]]
 local Config = {
-    -- 에임봇
     AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
     AimRange = 1000,
+    Smoothing = 0.1, -- 에임 부드러움 (0.01 ~ 1)
     
-    -- 스캐너
     ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
     
-    -- ESP
     ESPEnabled = false,
     ESPColor = Color3.fromRGB(175, 25, 255)
 }
 
 -- [[ UI 생성 ]]
 local Window = Rayfield:CreateWindow({
-    Name = "RICE SEC PREMIUM V6 - FINAL",
-    LoadingTitle = "RiceSec Systems",
-    LoadingSubtitle = "by Premium Scripts",
+    Name = "RICE SEC V6 - RIVALS OPTIMIZED",
+    LoadingTitle = "Rivals Edition",
+    LoadingSubtitle = "Anti-Snap & Smooth Aim",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
@@ -53,6 +50,17 @@ CombatTab:CreateKeybind({
     Flag = "AimBind",
     Callback = function(Keybind)
         Config.AimKey = typeof(Keybind) == "EnumItem" and Keybind or Enum.KeyCode[Keybind]
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Smoothness (부드러움)",
+    Info = "낮을수록 부드럽고 팔 돌아감이 적습니다.",
+    Range = {1, 100},
+    Increment = 1,
+    CurrentValue = 10,
+    Callback = function(Value) 
+        Config.Smoothing = Value / 100 -- 0.01 ~ 1.0 값으로 변환
     end,
 })
 
@@ -101,55 +109,37 @@ VisualsTab:CreateKeybind({
 
 -- [[ 로직 파트 ]]
 
--- 하이라이트 ESP 폴더
 local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
 HL_Folder.Name = "RiceHL"
 
--- 스캐너 빌보드 생성 함수
+-- 스캐너 로직 (기존과 동일)
 local function CreateScanner(plr)
     if plr == LocalPlayer then return end
-    
     local function setup(char)
         local head = char:WaitForChild("Head", 10)
         if not head then return end
-        
         local bg = Instance.new("BillboardGui", head)
         bg.Name = "ScannerGui"
         bg.Size = UDim2.new(6, 0, 4, 0)
         bg.AlwaysOnTop = true
         bg.Enabled = false
         bg.StudsOffset = Vector3.new(0, 3, 0)
-
         local frame = Instance.new("Frame", bg)
         frame.Size = UDim2.new(1, 0, 1, 0)
         frame.BackgroundTransparency = 1
         Instance.new("UIListLayout", frame).HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-        local function mkLabel(name, color)
-            local l = Instance.new("TextLabel", frame)
-            l.Size = UDim2.new(1, 0, 0.3, 0)
-            l.BackgroundTransparency = 0.5
-            l.BackgroundColor3 = Color3.new(0,0,0)
-            l.TextColor3 = color
-            l.TextScaled = true
-            l.Font = Enum.Font.GothamBold
-            Instance.new("UICorner", l)
-            return l
-        end
-
-        local nLabel = mkLabel("N", Color3.new(1,1,1))
-        local hLabel = mkLabel("H", Color3.new(0,1,0))
-
+        local nLabel = Instance.new("TextLabel", frame)
+        nLabel.Size = UDim2.new(1, 0, 0.3, 0)
+        nLabel.BackgroundTransparency = 0.5
+        nLabel.BackgroundColor3 = Color3.new(0,0,0)
+        nLabel.TextColor3 = Color3.new(1,1,1)
+        nLabel.TextScaled = true
+        Instance.new("UICorner", nLabel)
         task.spawn(function()
             while char and char.Parent do
                 if bg.Enabled then
-                    local hum = char:FindFirstChild("Humanoid")
                     local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude)
                     nLabel.Text = string.format("%s [%dM]", plr.DisplayName, dist)
-                    if hum then
-                        hLabel.Text = string.format("HP: %d / %d", math.floor(hum.Health), math.floor(hum.MaxHealth))
-                        hLabel.TextColor3 = Color3.fromHSV(math.clamp(hum.Health/hum.MaxHealth, 0, 1) * 0.35, 0.9, 1)
-                    end
                 end
                 task.wait(0.2)
             end
@@ -158,11 +148,10 @@ local function CreateScanner(plr)
     plr.CharacterAdded:Connect(setup)
     if plr.Character then setup(plr.Character) end
 end
-
 for _, p in ipairs(Players:GetPlayers()) do CreateScanner(p) end
 Players.PlayerAdded:Connect(CreateScanner)
 
--- 에임봇 타겟 찾기 (가장 가까운 적)
+-- 에임봇 타겟 찾기
 local function GetTarget()
     local target = nil
     local dist = math.huge
@@ -204,15 +193,17 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 2. 에임봇 (마스터 켜짐 + 키 누르고 있음)
+    -- 2. 부드러운 에임봇 (Smooth Aim)
     if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
         local target = GetTarget()
         if target then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+            -- 핵심: CFrame.lookAt을 바로 대입하지 않고 Lerp를 사용하여 부드럽게 이동
+            local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Config.Smoothing)
         end
     end
 
-    -- 3. 스캐너 (마스터 켜짐 + 키 누르고 있음)
+    -- 3. 스캐너
     local isScanning = Config.ScannerMaster and UserInputService:IsKeyDown(Config.ScannerKey)
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
@@ -223,7 +214,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "RICE SEC V6 LOADED",
-    Content = "에임봇과 스캐너는 지정된 키를 꾹 누를 때만 활성화됩니다.",
+    Title = "RICE SEC V6",
+    Content = "팔 돌아감 방지를 위해 Smoothness를 조절하세요.",
     Duration = 5
 })
