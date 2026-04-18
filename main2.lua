@@ -1,6 +1,6 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- [[ 기본 서비스 설정 ]]
+-- [[ 서비스 설정 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,37 +8,36 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ 전역 설정 값 ]]
+-- [[ 설정 데이터 ]]
 local Config = {
-    -- 에임봇 설정
+    -- 에임봇
     AimbotMaster = false,
     AimKey = Enum.KeyCode.E,
     AimRange = 1000,
     
-    -- 스캐너 설정
+    -- 스캐너
     ScannerMaster = false,
     ScannerKey = Enum.KeyCode.V,
     
-    -- 비주얼(ESP) 설정
-    HighlightEnabled = false,
+    -- ESP
+    ESPEnabled = false,
     ESPColor = Color3.fromRGB(175, 25, 255)
 }
 
--- [[ UI 창 생성 ]]
+-- [[ UI 생성 ]]
 local Window = Rayfield:CreateWindow({
-    Name = "RICE SEC PREMIUM V6",
-    LoadingTitle = "RiceSec Hub",
-    LoadingSubtitle = "High Performance Scripts",
+    Name = "RICE SEC PREMIUM V6 - FINAL",
+    LoadingTitle = "RiceSec Systems",
+    LoadingSubtitle = "by Premium Scripts",
     ConfigurationSaving = { Enabled = false },
     KeySystem = false
 })
 
--- [[ 탭 생성 ]]
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483345998)
 
--- [[ 1. COMBAT 탭 구성 ]]
-CombatTab:CreateSection("Aimbot Master Settings")
+-- [[ 1. COMBAT 탭 ]]
+CombatTab:CreateSection("Aimbot Master")
 
 CombatTab:CreateToggle({
     Name = "Enable Aimbot System",
@@ -48,40 +47,40 @@ CombatTab:CreateToggle({
 })
 
 CombatTab:CreateKeybind({
-    Name = "Aimbot Hold Key",
+    Name = "Aimbot Hotkey",
     CurrentKeybind = "E",
     HoldToInteract = false,
     Flag = "AimBind",
-    Callback = function(Keybind) 
+    Callback = function(Keybind)
         Config.AimKey = typeof(Keybind) == "EnumItem" and Keybind or Enum.KeyCode[Keybind]
     end,
 })
 
 CombatTab:CreateSlider({
-    Name = "Aimbot FOV Range",
+    Name = "Aimbot Range",
     Range = {100, 3000},
     Increment = 100,
     CurrentValue = 1000,
     Callback = function(Value) Config.AimRange = Value end,
 })
 
--- [[ 2. VISUALS 탭 구성 ]]
-VisualsTab:CreateSection("Highlight ESP")
+-- [[ 2. VISUALS 탭 ]]
+VisualsTab:CreateSection("Glow ESP")
 
 VisualsTab:CreateToggle({
-    Name = "Glow (Highlight)",
+    Name = "Player Glow (Highlight)",
     CurrentValue = false,
     Flag = "GlowToggle",
-    Callback = function(Value) Config.HighlightEnabled = Value end,
+    Callback = function(Value) Config.ESPEnabled = Value end,
 })
 
 VisualsTab:CreateColorPicker({
-    Name = "ESP Color",
+    Name = "Glow Color",
     Color = Color3.fromRGB(175, 25, 255),
     Callback = function(Value) Config.ESPColor = Value end
 })
 
-VisualsTab:CreateSection("Scanner Master Settings")
+VisualsTab:CreateSection("Scanner Master")
 
 VisualsTab:CreateToggle({
     Name = "Enable Scanner System",
@@ -91,26 +90,26 @@ VisualsTab:CreateToggle({
 })
 
 VisualsTab:CreateKeybind({
-    Name = "Scanner Hold Key",
+    Name = "Scanner Hotkey",
     CurrentKeybind = "V",
     HoldToInteract = false,
     Flag = "ScanBind",
-    Callback = function(Keybind) 
+    Callback = function(Keybind)
         Config.ScannerKey = typeof(Keybind) == "EnumItem" and Keybind or Enum.KeyCode[Keybind]
     end,
 })
 
--- [[ 핵심 기능 로직 구현 ]]
+-- [[ 로직 파트 ]]
 
--- 1. 하이라이트 ESP 관리
+-- 하이라이트 ESP 폴더
 local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
 HL_Folder.Name = "RiceHL"
 
--- 2. 스캐너 GUI 생성 (머리 위에 정보 표시)
-local function createScanner(player)
-    if player == LocalPlayer then return end
+-- 스캐너 빌보드 생성 함수
+local function CreateScanner(plr)
+    if plr == LocalPlayer then return end
     
-    local function setupChar(char)
+    local function setup(char)
         local head = char:WaitForChild("Head", 10)
         if not head then return end
         
@@ -124,80 +123,63 @@ local function createScanner(player)
         local frame = Instance.new("Frame", bg)
         frame.Size = UDim2.new(1, 0, 1, 0)
         frame.BackgroundTransparency = 1
-        
-        local layout = Instance.new("UIListLayout", frame)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        layout.Padding = UDim.new(0, 2)
+        Instance.new("UIListLayout", frame).HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-        local function createLabel(name, color)
-            local lbl = Instance.new("TextLabel", frame)
-            lbl.Name = name
-            lbl.Size = UDim2.new(1, 0, 0.25, 0)
-            lbl.BackgroundTransparency = 0.5
-            lbl.BackgroundColor3 = Color3.new(0,0,0)
-            lbl.TextColor3 = color
-            lbl.TextScaled = true
-            lbl.Font = Enum.Font.GothamBold
-            Instance.new("UICorner", lbl)
-            return lbl
+        local function mkLabel(name, color)
+            local l = Instance.new("TextLabel", frame)
+            l.Size = UDim2.new(1, 0, 0.3, 0)
+            l.BackgroundTransparency = 0.5
+            l.BackgroundColor3 = Color3.new(0,0,0)
+            l.TextColor3 = color
+            l.TextScaled = true
+            l.Font = Enum.Font.GothamBold
+            Instance.new("UICorner", l)
+            return l
         end
 
-        local nameLabel = createLabel("NameLabel", Color3.new(1,1,1))
-        local hpLabel = createLabel("HPLabel", Color3.new(0,1,0))
-        local itemLabel = createLabel("ItemLabel", Color3.new(1,1,0))
+        local nLabel = mkLabel("N", Color3.new(1,1,1))
+        local hLabel = mkLabel("H", Color3.new(0,1,0))
 
         task.spawn(function()
             while char and char.Parent do
                 if bg.Enabled then
                     local hum = char:FindFirstChild("Humanoid")
                     local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude)
-                    
-                    nameLabel.Text = string.format("%s [%dM]", player.DisplayName, dist)
+                    nLabel.Text = string.format("%s [%dM]", plr.DisplayName, dist)
                     if hum then
-                        hpLabel.Text = "HP: " .. math.floor(hum.Health)
-                        hpLabel.TextColor3 = Color3.fromHSV(math.clamp(hum.Health/hum.MaxHealth, 0, 1) * 0.35, 0.9, 1)
-                    end
-
-                    -- 아이템 스캐너 로직 (특정 게임 UI 기반)
-                    local inv = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("MainGui")
-                    if inv then
-                        -- 게임의 UI 구조에 맞춰 이 부분을 수정할 수 있습니다.
-                        itemLabel.Text = "Scanning Inventory..."
-                        itemLabel.Visible = true
-                    else
-                        itemLabel.Visible = false
+                        hLabel.Text = string.format("HP: %d / %d", math.floor(hum.Health), math.floor(hum.MaxHealth))
+                        hLabel.TextColor3 = Color3.fromHSV(math.clamp(hum.Health/hum.MaxHealth, 0, 1) * 0.35, 0.9, 1)
                     end
                 end
                 task.wait(0.2)
             end
         end)
     end
-    player.CharacterAdded:Connect(setupChar)
-    if player.Character then setupChar(player.Character) end
+    plr.CharacterAdded:Connect(setup)
+    if plr.Character then setup(plr.Character) end
 end
 
-for _, p in ipairs(Players:GetPlayers()) do createScanner(p) end
-Players.PlayerAdded:Connect(createScanner)
+for _, p in ipairs(Players:GetPlayers()) do CreateScanner(p) end
+Players.PlayerAdded:Connect(CreateScanner)
 
--- 3. 에임봇 타겟 찾기
-local function getClosestEnemy()
+-- 에임봇 타겟 찾기 (가장 가까운 적)
+local function GetTarget()
     local target = nil
-    local shortestMouseDist = math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local dist = math.huge
+    local mousePos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            local head = p.Character.Head
             local hum = p.Character:FindFirstChild("Humanoid")
-            
             if hum and hum.Health > 0 then
+                local head = p.Character.Head
                 local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
-                    local wDist = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
-                    if wDist <= Config.AimRange then
-                        local mDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                        if mDist < shortestMouseDist then
-                            shortestMouseDist = mDist
+                    local worldDist = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Magnitude
+                    if worldDist <= Config.AimRange then
+                        local screenDist = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        if screenDist < dist then
+                            dist = screenDist
                             target = head
                         end
                     end
@@ -216,21 +198,21 @@ RunService.RenderStepped:Connect(function()
             local hl = HL_Folder:FindFirstChild(p.Name) or Instance.new("Highlight", HL_Folder)
             hl.Name = p.Name
             hl.Adornee = p.Character
-            hl.Enabled = Config.HighlightEnabled
+            hl.Enabled = Config.ESPEnabled
             hl.FillColor = Config.ESPColor
             hl.OutlineColor = Color3.new(1,1,1)
         end
     end
 
-    -- 2. 에임봇 (마스터 온 + 키 누름 중)
+    -- 2. 에임봇 (마스터 켜짐 + 키 누르고 있음)
     if Config.AimbotMaster and UserInputService:IsKeyDown(Config.AimKey) then
-        local target = getClosestEnemy()
+        local target = GetTarget()
         if target then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
         end
     end
 
-    -- 3. 스캐너 (마스터 온 + 키 누름 중)
+    -- 3. 스캐너 (마스터 켜짐 + 키 누르고 있음)
     local isScanning = Config.ScannerMaster and UserInputService:IsKeyDown(Config.ScannerKey)
     for _, p in ipairs(Players:GetPlayers()) do
         if p.Character and p.Character:FindFirstChild("Head") then
@@ -242,6 +224,6 @@ end)
 
 Rayfield:Notify({
     Title = "RICE SEC V6 LOADED",
-    Content = "에임봇(E)와 스캐너(V)는 키를 꾹 누르고 있을 때만 작동합니다.",
+    Content = "에임봇과 스캐너는 지정된 키를 꾹 누를 때만 활성화됩니다.",
     Duration = 5
 })
