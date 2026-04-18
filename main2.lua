@@ -6,204 +6,202 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ 전역 설정 값 ]]
+-- [[ 설정 값 ]]
 local Config = {
     Toggles = { Scanner = false, Aimbot = false, Highlight = false },
     Binds = { Scanner = Enum.KeyCode.V, Aimbot = Enum.KeyCode.E, Menu = Enum.KeyCode.RightShift },
-    Colors = { ESP = Color3.fromRGB(175, 25, 255), UI = Color3.fromRGB(100, 100, 255) },
+    ESPColor = Color3.fromRGB(175, 25, 255),
     UI_Open = true,
-    Listening = nil -- 현재 키 바인딩 대기 중인 기능
+    Listening = nil
 }
 
--- [[ 하이라이트 저장소 ]]
-local HL_Folder = CoreGui:FindFirstChild("RiceHL_Storage") or Instance.new("Folder", CoreGui)
-HL_Folder.Name = "RiceHL_Storage"
+-- [[ 하이라이트(Highlight) 설명 ]]
+-- 하이라이트는 캐릭터 모델 전체에 "광원(Glow)" 효과를 주는 기능입니다. 
+-- 벽 뒤에서도 적의 실루엣을 뚜렷하게 볼 수 있어 일반 박스 ESP보다 시인성이 훨씬 좋습니다.
 
--- [[ 고퀄리티 UI 생성 ]]
+-- [[ UI 생성 및 드래그 로직 ]]
 local ScreenGui = Instance.new("ScreenGui", CoreGui)
-ScreenGui.Name = "RiceSec_Premium_V3"
+ScreenGui.Name = "RiceSec_V5_Ultimate"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.Size = UDim2.new(0, 260, 0, 340)
-MainFrame.Position = UDim2.new(0.5, 0, 0.45, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.Size = UDim2.new(0, 450, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -225, 0.4, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = Color3.fromRGB(60, 60, 70)
+MainStroke.Thickness = 1.5
 
--- 테두리 빛 효과
-local Stroke = Instance.new("UIStroke", MainFrame)
-Stroke.Color = Config.Colors.UI
-Stroke.Thickness = 2
-Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 50)
-Title.Text = "RICE SEC PREMIUM"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Instance.new("UICorner", Title)
-
-local Container = Instance.new("Frame", MainFrame)
-Container.Size = UDim2.new(1, 0, 1, -55)
-Container.Position = UDim2.new(0, 0, 0, 55)
-Container.BackgroundTransparency = 1
-local Layout = Instance.new("UIListLayout", Container)
-Layout.Padding = UDim.new(0, 10)
-Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
--- [[ 유틸리티: 버튼 생성 함수 ]]
-local function CreateMenuRow(name, key)
-    local Row = Instance.new("Frame", Container)
-    Row.Size = UDim2.new(0.9, 0, 0, 45)
-    Row.BackgroundTransparency = 1
-
-    local Toggle = Instance.new("TextButton", Row)
-    Toggle.Size = UDim2.new(0.65, 0, 1, 0)
-    Toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    Toggle.Text = "○ " .. name
-    Toggle.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Toggle.Font = Enum.Font.GothamMedium
-    Toggle.TextSize = 12
-    Instance.new("UICorner", Toggle)
-
-    local Bind = Instance.new("TextButton", Row)
-    Bind.Size = UDim2.new(0.3, 0, 1, 0)
-    Bind.Position = UDim2.new(0.7, 0, 0, 0)
-    Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    Bind.Text = Config.Binds[key] and Config.Binds[key].Name or "None"
-    Bind.TextColor3 = Config.Colors.UI
-    Bind.Font = Enum.Font.Code
-    Bind.TextSize = 12
-    Instance.new("UICorner", Bind)
-
-    -- 토글 이벤트
-    Toggle.MouseButton1Click:Connect(function()
-        Config.Toggles[key] = not Config.Toggles[key]
-        Toggle.Text = (Config.Toggles[key] and "● " or "○ ") .. name
-        TweenService:Create(Toggle, TweenInfo.new(0.3), {TextColor3 = Config.Toggles[key] and Color3.new(0, 1, 0.5) or Color3.fromRGB(200, 200, 200)}):Play()
-        
-        if key == "Highlight" then
-            for _, v in ipairs(HL_Folder:GetChildren()) do v.Enabled = Config.Toggles.Highlight end
-        end
-    end)
-
-    -- 키바인드 설정 이벤트
-    Bind.MouseButton1Click:Connect(function()
-        Config.Listening = key
-        Bind.Text = "..."
-        Bind.BackgroundColor3 = Color3.fromRGB(60, 50, 20)
-    end)
-
-    return {Toggle = Toggle, Bind = Bind}
-end
-
--- 색상 변경 로직 (ESP 색상 입력)
-local function CreateColorInput()
-    local Row = Instance.new("Frame", Container)
-    Row.Size = UDim2.new(0.9, 0, 0, 45)
-    Row.BackgroundTransparency = 1
-    
-    local Label = Instance.new("TextLabel", Row)
-    Label.Size = UDim2.new(0.4, 0, 1, 0)
-    Label.Text = "ESP COLOR (RGB)"
-    Label.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-    Label.BackgroundTransparency = 1
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = 10
-
-    local Input = Instance.new("TextBox", Row)
-    Input.Size = UDim2.new(0.55, 0, 1, 0)
-    Input.Position = UDim2.new(0.45, 0, 0, 0)
-    Input.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    Input.Text = "175, 25, 255"
-    Input.TextColor3 = Color3.new(1,1,1)
-    Input.Font = Enum.Font.Code
-    Input.TextSize = 12
-    Instance.new("UICorner", Input)
-
-    Input.FocusLost:Connect(function()
-        local r, g, b = Input.Text:match("(%d+),%s*(%d+),%s*(%d+)")
-        if r and g and b then
-            Config.Colors.ESP = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
-            for _, v in ipairs(HL_Folder:GetChildren()) do v.FillColor = Config.Colors.ESP end
-        end
-    end)
-end
-
-local UI_Scanner = CreateMenuRow("SCANNER", "Scanner")
-local UI_Aimbot = CreateMenuRow("AIMBOT", "Aimbot")
-local UI_Highlight = CreateMenuRow("HIGHLIGHT", "Highlight")
-CreateColorInput()
-
--- [[ 핵심 기능 로직 ]]
-
--- 하이라이트 ESP
-local function ApplyHighlight(plr)
-    if plr == LocalPlayer then return end
-    local hl = Instance.new("Highlight", HL_Folder)
-    hl.Name = plr.Name
-    hl.FillColor = Config.Colors.ESP
-    hl.Enabled = Config.Toggles.Highlight
-    local function update(char) hl.Adornee = char end
-    if plr.Character then update(plr.Character) end
-    plr.CharacterAdded:Connect(update)
-end
-
--- 키 입력 감지 (토글 & 바인딩)
-UserInputService.InputBegan:Connect(function(io, gpe)
-    if Config.Listening then
-        if io.UserInputType == Enum.UserInputType.Keyboard then
-            Config.Binds[Config.Listening] = io.KeyCode
-            if Config.Listening == "Scanner" then UI_Scanner.Bind.Text = io.KeyCode.Name
-            elseif Config.Listening == "Aimbot" then UI_Aimbot.Bind.Text = io.KeyCode.Name end
-            UI_Scanner.Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            UI_Aimbot.Bind.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            Config.Listening = nil
-        end
-        return
+-- 드래그 기능 (상단 바 클릭 시 이동)
+local DragBar = Instance.new("Frame", MainFrame)
+DragBar.Size = UDim2.new(1, 0, 0, 40)
+DragBar.BackgroundTransparency = 1
+local dragging, dragInput, dragStart, startPos
+DragBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true dragStart = input.Position startPos = MainFrame.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
     end
-
-    if gpe then return end
-    if io.KeyCode == Config.Binds.Menu then
-        Config.UI_Open = not Config.UI_Open
-        TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = Config.UI_Open and UDim2.new(0, 260, 0, 340) or UDim2.new(0,0,0,0)}):Play()
+end)
+DragBar.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- 루프 연산 (Aimbot & Scanner)
-RunService.RenderStepped:Connect(function()
-    local scannerDown = UserInputService:IsKeyDown(Config.Binds.Scanner)
-    local aimbotDown = UserInputService:IsKeyDown(Config.Binds.Aimbot)
+-- [[ 사이드바 (카테고리 구분) ]]
+local Sidebar = Instance.new("Frame", MainFrame)
+Sidebar.Size = UDim2.new(0, 120, 1, 0)
+Sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Instance.new("UICorner", Sidebar)
 
-    -- Scanner ESP 가시성 업데이트
+local Title = Instance.new("TextLabel", Sidebar)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Text = "RICE SEC"
+Title.TextColor3 = Color3.fromRGB(150, 150, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+-- [[ 섹션 생성 ]]
+local Content = Instance.new("Frame", MainFrame)
+Content.Position = UDim2.new(0, 130, 0, 10)
+Content.Size = UDim2.new(1, -140, 1, -20)
+Content.BackgroundTransparency = 1
+
+local function CreateCategory(name)
+    local l = Instance.new("TextLabel", Content)
+    l.Size = UDim2.new(1, 0, 0, 30)
+    l.Text = "--- " .. name .. " ---"
+    l.TextColor3 = Color3.fromRGB(100, 100, 110)
+    l.Font = Enum.Font.GothamMedium
+    l.TextSize = 12
+    l.BackgroundTransparency = 1
+end
+
+local function CreateToggle(name, key)
+    local Frame = Instance.new("Frame", Content)
+    Frame.Size = UDim2.new(1, 0, 0, 40)
+    Frame.BackgroundTransparency = 1
+    
+    local Btn = Instance.new("TextButton", Frame)
+    Btn.Size = UDim2.new(0.6, 0, 0.8, 0)
+    Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Btn.Text = "○ " .. name
+    Btn.TextColor3 = Color3.new(0.8,0.8,0.8)
+    Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 13
+    Instance.new("UICorner", Btn)
+
+    local Bind = Instance.new("TextButton", Frame)
+    Bind.Size = UDim2.new(0.35, 0, 0.8, 0)
+    Bind.Position = UDim2.new(0.65, 0, 0, 0)
+    Bind.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    Bind.Text = Config.Binds[key] and Config.Binds[key].Name or "None"
+    Bind.TextColor3 = Color3.fromRGB(150, 150, 255)
+    Instance.new("UICorner", Bind)
+
+    Btn.MouseButton1Click:Connect(function()
+        Config.Toggles[key] = not Config.Toggles[key]
+        Btn.Text = (Config.Toggles[key] and "● " or "○ ") .. name
+        Btn.TextColor3 = Config.Toggles[key] and Color3.new(0.4, 1, 0.4) or Color3.new(0.8,0.8,0.8)
+    end)
+
+    Bind.MouseButton1Click:Connect(function()
+        Config.Listening = key
+        Bind.Text = "..."
+    end)
+end
+
+-- 컬러보드 (RGB 슬라이더 대신 간편한 컬러 프리셋/직접입력)
+local function CreateColorPicker()
+    local Frame = Instance.new("Frame", Content)
+    Frame.Size = UDim2.new(1, 0, 0, 40)
+    Frame.BackgroundTransparency = 1
+    
+    local Lbl = Instance.new("TextLabel", Frame)
+    Lbl.Size = UDim2.new(0.4, 0, 1, 0)
+    Lbl.Text = "ESP GLOW COLOR"
+    Lbl.TextColor3 = Color3.new(1,1,1)
+    Lbl.Font = Enum.Font.Gotham
+    Lbl.TextSize = 11
+    Lbl.BackgroundTransparency = 1
+
+    local Box = Instance.new("TextBox", Frame)
+    Box.Size = UDim2.new(0.55, 0, 0.8, 0)
+    Box.Position = UDim2.new(0.45, 0, 0, 0)
+    Box.BackgroundColor3 = Config.ESPColor
+    Box.Text = "RGB: 175, 25, 255"
+    Box.Font = Enum.Font.Code
+    Box.TextSize = 10
+    Instance.new("UICorner", Box)
+
+    Box.FocusLost:Connect(function()
+        local r, g, b = Box.Text:match("(%d+),%s*(%d+),%s*(%d+)")
+        if r and g and b then
+            Config.ESPColor = Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+            Box.BackgroundColor3 = Config.ESPColor
+        end
+    end)
+end
+
+local Layout = Instance.new("UIListLayout", Content)
+Layout.Padding = UDim.new(0, 5)
+
+-- 카테고리별 배치
+CreateCategory("COMBAT")
+CreateToggle("AIMBOT", "Aimbot")
+CreateCategory("VISUALS")
+CreateToggle("SCANNER ESP", "Scanner")
+CreateToggle("PLAYER GLOW", "Highlight")
+CreateColorPicker()
+
+-- [[ 기능 로직 ]]
+local HL_Folder = CoreGui:FindFirstChild("RiceHL") or Instance.new("Folder", CoreGui)
+HL_Folder.Name = "RiceHL"
+
+UserInputService.InputBegan:Connect(function(io, g)
+    if Config.Listening then
+        Config.Binds[Config.Listening] = io.KeyCode
+        Config.Listening = nil
+        MainFrame.Visible = true -- 키 세팅 후 UI 갱신 (직접 UI에서 텍스트 업데이트 로직 추가 권장)
+        return
+    end
+    if g then return end
+    if io.KeyCode == Config.Binds.Menu then
+        Config.UI_Open = not Config.UI_Open
+        MainFrame.Visible = Config.UI_Open
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    -- 하이라이트(GLOW) 실시간 처리
     for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character and p.Character:FindFirstChild("Head") then
-            local sg = p.Character.Head:FindFirstChild("ScannerGui")
-            if sg then sg.Enabled = (Config.Toggles.Scanner and scannerDown) end
+        if p ~= LocalPlayer and p.Character then
+            local hl = HL_Folder:FindFirstChild(p.Name) or Instance.new("Highlight", HL_Folder)
+            hl.Name = p.Name
+            hl.Adornee = p.Character
+            hl.Enabled = Config.Toggles.Highlight
+            hl.FillColor = Config.ESPColor
+            hl.OutlineColor = Color3.new(1, 1, 1)
         end
     end
 
-    -- Aimbot 로직
-    if Config.Toggles.Aimbot and aimbotDown then
+    -- 에임봇 (E키)
+    if Config.Toggles.Aimbot and UserInputService:IsKeyDown(Config.Binds.Aimbot) then
         local target = nil
-        local shortest = math.huge
+        local dist = math.huge
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
                 local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
                 if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                    if dist < shortest then shortest = dist target = p.Character.Head end
+                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if mag < dist then dist = mag target = p.Character.Head end
                 end
             end
         end
         if target then Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position) end
     end
 end)
-
--- 초기화
-for _, p in ipairs(Players:GetPlayers()) do ApplyHighlight(p) end
-Players.PlayerAdded:Connect(ApplyHighlight)
