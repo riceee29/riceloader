@@ -76,7 +76,7 @@ MainTab:CreateSection("Main Feature")
 MainTab:CreateButton({
     Name = "Main Rival (Anti-Spin & Smooth Aim)",
     Callback = function()
-        ExecuteAndClose("Main Rival", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main2.lua")
+        ExecuteAndClose("Rival", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main2.lua")
     end,
 })
 
