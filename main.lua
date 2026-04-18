@@ -105,9 +105,9 @@ MainTab:CreateSection("Other Scripts")
 
 -- [2] Aimbot V3 스크립트
 MainTab:CreateButton({
-    Name = "🎯 Aimbot V3 - Precision Lock",
+    Name = "🎮admin",
     Callback = function()
-        ExecuteScript("Aimbot V3", "https://raw.githubusercontent.com/url2") -- 실제 주소로 변경 필요
+        ExecuteScript("admin", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source") -- 실제 주소로 변경 필요
     end,
 })
 
