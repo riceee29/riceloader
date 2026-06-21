@@ -112,6 +112,15 @@ MainTab:CreateButton({
     end,
 })
 
+-- [3] 대체용 빈 스크립트 예시 (작동 확인용)
+MainTab:CreateButton({
+    Name = "99 tool",
+    Callback = function()
+        ExecuteScript("99 tool", "https://raw.githubusercontent.com/riceee29/riceloader/refs/heads/main/main4.lua")
+    end,
+})
+
+
 -- [[ 정보 탭 ]]
 local InfoTab = Window:CreateTab("Information", 4483345998)
 InfoTab:CreateSection("Credits")
