@@ -11,7 +11,6 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false,
 })
 
--- Create Tabs
 local ItemTab = Window:CreateTab("Items", 4483362458)
 local AdminTab = Window:CreateTab("Admin", 4483362458)
 
@@ -19,7 +18,6 @@ local AdminTab = Window:CreateTab("Admin", 4483362458)
 -- [1] Item Fetching Features (Items Folder)
 ---------------------------------------------------------
 
--- Function to get item names from workspace.Items
 local function getDroppedItems()
     local items = {}
     local itemCheck = {}
@@ -45,7 +43,7 @@ end
 
 local selectedItem = ""
 
--- Dropdown (Item List)
+-- Dropdown (Item List) - 에러 방지 처리 완료
 local ItemDropdown = ItemTab:CreateDropdown({
    Name = "Select Item to Fetch",
    Options = getDroppedItems(),
@@ -53,28 +51,28 @@ local ItemDropdown = ItemTab:CreateDropdown({
    MultipleOptions = false,
    Flag = "ItemDropdown",
    Callback = function(Option)
-       selectedItem = Option[1]
+       -- 콜백 에러 방지 (테이블인지 문자열인지 확인)
+       if type(Option) == "table" and Option[1] then
+           selectedItem = Option[1]
+       elseif type(Option) == "string" then
+           selectedItem = Option
+       end
    end,
 })
 
--- Refresh List Button
 ItemTab:CreateButton({
    Name = "🔄 Refresh Item List",
    Callback = function()
        ItemDropdown:Refresh(getDroppedItems())
-       Rayfield:Notify({
-           Title = "Refreshed",
-           Content = "Item list has been successfully updated.",
-           Duration = 3,
-       })
+       Rayfield:Notify({ Title = "Refreshed", Content = "Item list updated.", Duration = 3 })
    end,
 })
 
 ItemTab:CreateSection("Teleport Items")
 
--- Bring Selected Item Button
+-- 선택한 아이템 가져오기 (원형 배치 + Chest 구분)
 ItemTab:CreateButton({
-   Name = "✨ Bring Selected Item to Me",
+   Name = "✨ Bring Selected Item",
    Callback = function()
        if selectedItem ~= "" and selectedItem ~= "No Items Found" then
            local player = game.Players.LocalPlayer
@@ -83,35 +81,56 @@ ItemTab:CreateButton({
            local itemsFolder = workspace:FindFirstChild("Items")
 
            if hrp and itemsFolder then
-               local count = 0
+               local objectsToMove = {}
+               
+               -- 가져올 아이템들 수집
                for _, obj in pairs(itemsFolder:GetChildren()) do
                    if obj.Name == selectedItem then
-                       -- Move Models (like Bandage, Berry) using PivotTo
-                       if obj:IsA("Model") then
-                           obj:PivotTo(hrp.CFrame * CFrame.new(0, 0, -3))
-                           count = count + 1
-                       elseif obj:IsA("BasePart") then
-                           obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
-                           count = count + 1
-                       end
+                       table.insert(objectsToMove, obj)
                    end
                end
                
-               if count > 0 then
-                   Rayfield:Notify({ Title = "Success!", Content = "Brought " .. count .. "x " .. selectedItem .. " to you.", Duration = 3 })
+               local total = #objectsToMove
+               if total > 0 then
+                   -- 이름에 "Chest"가 들어가는지 확인
+                   local isChest = string.match(selectedItem, "Chest")
+                   
+                   -- 중심점 설정: Chest는 앞쪽 10칸, 일반 아이템은 왼쪽 5칸
+                   local centerCFrame
+                   if isChest then
+                       centerCFrame = hrp.CFrame * CFrame.new(0, 0, -10) -- 10칸 멀리(정면)
+                   else
+                       centerCFrame = hrp.CFrame * CFrame.new(-5, 0, 0) -- 왼쪽(Left)
+                   end
+
+                   -- 아이템들을 둥글게(Circle) 배치
+                   for i, obj in ipairs(objectsToMove) do
+                       local angle = (i / total) * math.pi * 2
+                       local radius = math.max(3, total * 0.15) -- 개수가 많으면 원이 커짐
+                       local offset = CFrame.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                       local finalCFrame = centerCFrame * offset
+                       
+                       if obj:IsA("Model") then
+                           obj:PivotTo(finalCFrame)
+                       elseif obj:IsA("BasePart") then
+                           obj.CFrame = finalCFrame
+                       end
+                   end
+                   
+                   Rayfield:Notify({ Title = "Success!", Content = "Brought " .. total .. "x " .. selectedItem, Duration = 3 })
                else
-                   Rayfield:Notify({ Title = "Failed", Content = "Could not find the item in the map.", Duration = 3 })
+                   Rayfield:Notify({ Title = "Failed", Content = "Item not found in map.", Duration = 3 })
                end
            end
        else
-           Rayfield:Notify({ Title = "Warning", Content = "Please select an item from the dropdown first.", Duration = 3 })
+           Rayfield:Notify({ Title = "Warning", Content = "Select an item first.", Duration = 3 })
        end
    end,
 })
 
--- Bring ALL Items Button
+-- 모든 아이템 가져오기 (Chest/일반 분리 + 원형 배치)
 ItemTab:CreateButton({
-   Name = "🔥 Bring [ALL ITEMS] to Me",
+   Name = "🔥 Bring [ALL ITEMS]",
    Callback = function()
        local player = game.Players.LocalPlayer
        local character = player.Character or player.CharacterAdded:Wait()
@@ -119,33 +138,53 @@ ItemTab:CreateButton({
        local itemsFolder = workspace:FindFirstChild("Items")
 
        if hrp and itemsFolder then
-           local count = 0
+           local chests = {}
+           local normals = {}
+           
+           -- 상자와 일반 아이템 분류
            for _, obj in pairs(itemsFolder:GetChildren()) do
-               if obj:IsA("Model") then
-                   -- Randomize position slightly to prevent lag from stacking in one exact spot
-                   local offsetX = math.random(-20, 20) / 10
-                   local offsetZ = math.random(-50, -30) / 10
-                   obj:PivotTo(hrp.CFrame * CFrame.new(offsetX, 0, offsetZ))
-                   count = count + 1
-               elseif obj:IsA("BasePart") then
-                   local offsetX = math.random(-20, 20) / 10
-                   local offsetZ = math.random(-50, -30) / 10
-                   obj.CFrame = hrp.CFrame * CFrame.new(offsetX, 0, offsetZ)
-                   count = count + 1
+               if obj:IsA("Model") or obj:IsA("BasePart") then
+                   if string.match(obj.Name, "Chest") then
+                       table.insert(chests, obj)
+                   else
+                       table.insert(normals, obj)
+                   end
                end
            end
            
-           if count > 0 then
-               Rayfield:Notify({
-                   Title = "Swept Everything!",
-                   Content = "Brought a total of " .. count .. " items to you.",
-                   Duration = 3,
-               })
-           else
-               Rayfield:Notify({ Title = "No Items", Content = "The Items folder is currently empty.", Duration = 3 })
+           local totalCount = 0
+
+           -- Chest(상자)들 10칸 멀리 동그랗게 배치
+           if #chests > 0 then
+               local chestCenter = hrp.CFrame * CFrame.new(0, 0, -10)
+               for i, obj in ipairs(chests) do
+                   local angle = (i / #chests) * math.pi * 2
+                   local radius = math.max(3, #chests * 0.15)
+                   local offset = CFrame.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                   if obj:IsA("Model") then obj:PivotTo(chestCenter * offset)
+                   elseif obj:IsA("BasePart") then obj.CFrame = chestCenter * offset end
+                   totalCount = totalCount + 1
+               end
            end
-       else
-           Rayfield:Notify({ Title = "Error", Content = "Could not find Player or Items folder.", Duration = 3 })
+           
+           -- 일반 아이템들 왼쪽 동그랗게 배치
+           if #normals > 0 then
+               local normalCenter = hrp.CFrame * CFrame.new(-6, 0, 0) -- 왼쪽
+               for i, obj in ipairs(normals) do
+                   local angle = (i / #normals) * math.pi * 2
+                   local radius = math.max(3, #normals * 0.15)
+                   local offset = CFrame.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                   if obj:IsA("Model") then obj:PivotTo(normalCenter * offset)
+                   elseif obj:IsA("BasePart") then obj.CFrame = normalCenter * offset end
+                   totalCount = totalCount + 1
+               end
+           end
+           
+           if totalCount > 0 then
+               Rayfield:Notify({ Title = "Swept Everything!", Content = "Brought " .. totalCount .. " items.", Duration = 3 })
+           else
+               Rayfield:Notify({ Title = "No Items", Content = "The Items folder is empty.", Duration = 3 })
+           end
        end
    end,
 })
@@ -158,6 +197,6 @@ AdminTab:CreateButton({
    Name = "🚀 Execute Infinity Yield",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infinityyield/master/source'))()
-       Rayfield:Notify({ Title = "Executed", Content = "Infinity Yield has been loaded.", Duration = 3 })
+       Rayfield:Notify({ Title = "Executed", Content = "Infinity Yield loaded.", Duration = 3 })
    end,
 })
