@@ -1,44 +1,43 @@
--- Rayfield UI 라이브러리 불러오기
+-- Load Rayfield UI Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- 메인 창 만들기
+-- Create Main Window
 local Window = Rayfield:CreateWindow({
    Name = "99 Script Hub",
-   LoadingTitle = "99 스크립트 로딩 중...",
-   LoadingSubtitle = "아이템 가져오기 & 인피니티 일드",
-   ConfigurationSaving = {
-      Enabled = false,
-   },
-   Discord = {
-      Enabled = false,
-   },
-   KeySystem = false, -- 키 시스템 끄기
+   LoadingTitle = "Loading 99 Script...",
+   LoadingSubtitle = "Item Auto Farm & Infinity Yield",
+   ConfigurationSaving = { Enabled = false },
+   Discord = { Enabled = false },
+   KeySystem = false,
 })
 
--- 탭 생성
-local ItemTab = Window:CreateTab("아이템 (Items)", 4483362458)
-local AdminTab = Window:CreateTab("관리자 (Admin)", 4483362458)
+-- Create Tabs
+local ItemTab = Window:CreateTab("Items", 4483362458)
+local AdminTab = Window:CreateTab("Admin", 4483362458)
 
 ---------------------------------------------------------
--- [1] 아이템 가져오기 기능 (Items Tab)
+-- [1] Item Fetching Features (Items Folder)
 ---------------------------------------------------------
 
--- 월드(Workspace)에 떨어져 있는 아이템(Tool) 이름을 가져오는 함수
+-- Function to get item names from workspace.Items
 local function getDroppedItems()
     local items = {}
-    local itemCheck = {} -- 중복 방지용
+    local itemCheck = {}
+    local itemsFolder = workspace:FindFirstChild("Items")
     
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
-            if not itemCheck[obj.Name] then
-                table.insert(items, obj.Name)
-                itemCheck[obj.Name] = true
+    if itemsFolder then
+        for _, obj in pairs(itemsFolder:GetChildren()) do
+            if obj:IsA("Model") or obj:IsA("BasePart") then
+                if not itemCheck[obj.Name] then
+                    table.insert(items, obj.Name)
+                    itemCheck[obj.Name] = true
+                end
             end
         end
     end
     
     if #items == 0 then
-        table.insert(items, "아이템 없음")
+        table.insert(items, "No Items Found")
     end
     
     return items
@@ -46,9 +45,9 @@ end
 
 local selectedItem = ""
 
--- 드롭다운 (아이템 리스트)
+-- Dropdown (Item List)
 local ItemDropdown = ItemTab:CreateDropdown({
-   Name = "가져올 아이템 선택",
+   Name = "Select Item to Fetch",
    Options = getDroppedItems(),
    CurrentOption = {""},
    MultipleOptions = false,
@@ -58,75 +57,107 @@ local ItemDropdown = ItemTab:CreateDropdown({
    end,
 })
 
--- 목록 새로고침 버튼
+-- Refresh List Button
 ItemTab:CreateButton({
-   Name = "🔄 아이템 리스트 새로고침",
+   Name = "🔄 Refresh Item List",
    Callback = function()
        ItemDropdown:Refresh(getDroppedItems())
        Rayfield:Notify({
-           Title = "새로고침 완료",
-           Content = "바닥에 있는 아이템 목록을 다시 불러왔습니다.",
+           Title = "Refreshed",
+           Content = "Item list has been successfully updated.",
            Duration = 3,
        })
    end,
 })
 
--- 아이템을 플레이어 앞으로 가져오는 버튼
+ItemTab:CreateSection("Teleport Items")
+
+-- Bring Selected Item Button
 ItemTab:CreateButton({
-   Name = "✨ 선택한 아이템 내 앞으로 가져오기",
+   Name = "✨ Bring Selected Item to Me",
    Callback = function()
-       if selectedItem ~= "" and selectedItem ~= "아이템 없음" then
+       if selectedItem ~= "" and selectedItem ~= "No Items Found" then
            local player = game.Players.LocalPlayer
            local character = player.Character or player.CharacterAdded:Wait()
            local hrp = character:FindFirstChild("HumanoidRootPart")
+           local itemsFolder = workspace:FindFirstChild("Items")
 
-           if hrp then
-               local found = false
-               for _, obj in pairs(workspace:GetChildren()) do
-                   -- 이름이 일치하고 Handle이 있는 툴을 찾음
-                   if obj:IsA("Tool") and obj.Name == selectedItem and obj:FindFirstChild("Handle") then
-                       -- 플레이어의 3스터드(칸) 앞으로 아이템 이동
-                       obj.Handle.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
-                       found = true
+           if hrp and itemsFolder then
+               local count = 0
+               for _, obj in pairs(itemsFolder:GetChildren()) do
+                   if obj.Name == selectedItem then
+                       -- Move Models (like Bandage, Berry) using PivotTo
+                       if obj:IsA("Model") then
+                           obj:PivotTo(hrp.CFrame * CFrame.new(0, 0, -3))
+                           count = count + 1
+                       elseif obj:IsA("BasePart") then
+                           obj.CFrame = hrp.CFrame * CFrame.new(0, 0, -3)
+                           count = count + 1
+                       end
                    end
                end
                
-               if found then
-                   Rayfield:Notify({
-                       Title = "성공!",
-                       Content = selectedItem .. "을(를) 앞으로 가져왔습니다.",
-                       Duration = 3,
-                   })
+               if count > 0 then
+                   Rayfield:Notify({ Title = "Success!", Content = "Brought " .. count .. "x " .. selectedItem .. " to you.", Duration = 3 })
                else
-                   Rayfield:Notify({
-                       Title = "실패",
-                       Content = "아이템을 찾을 수 없거나 이미 누군가 주웠습니다.",
-                       Duration = 3,
-                   })
+                   Rayfield:Notify({ Title = "Failed", Content = "Could not find the item in the map.", Duration = 3 })
                end
            end
        else
-           Rayfield:Notify({
-               Title = "경고",
-               Content = "먼저 가져올 아이템을 선택해주세요.",
-               Duration = 3,
-           })
+           Rayfield:Notify({ Title = "Warning", Content = "Please select an item from the dropdown first.", Duration = 3 })
+       end
+   end,
+})
+
+-- Bring ALL Items Button
+ItemTab:CreateButton({
+   Name = "🔥 Bring [ALL ITEMS] to Me",
+   Callback = function()
+       local player = game.Players.LocalPlayer
+       local character = player.Character or player.CharacterAdded:Wait()
+       local hrp = character:FindFirstChild("HumanoidRootPart")
+       local itemsFolder = workspace:FindFirstChild("Items")
+
+       if hrp and itemsFolder then
+           local count = 0
+           for _, obj in pairs(itemsFolder:GetChildren()) do
+               if obj:IsA("Model") then
+                   -- Randomize position slightly to prevent lag from stacking in one exact spot
+                   local offsetX = math.random(-20, 20) / 10
+                   local offsetZ = math.random(-50, -30) / 10
+                   obj:PivotTo(hrp.CFrame * CFrame.new(offsetX, 0, offsetZ))
+                   count = count + 1
+               elseif obj:IsA("BasePart") then
+                   local offsetX = math.random(-20, 20) / 10
+                   local offsetZ = math.random(-50, -30) / 10
+                   obj.CFrame = hrp.CFrame * CFrame.new(offsetX, 0, offsetZ)
+                   count = count + 1
+               end
+           end
+           
+           if count > 0 then
+               Rayfield:Notify({
+                   Title = "Swept Everything!",
+                   Content = "Brought a total of " .. count .. " items to you.",
+                   Duration = 3,
+               })
+           else
+               Rayfield:Notify({ Title = "No Items", Content = "The Items folder is currently empty.", Duration = 3 })
+           end
+       else
+           Rayfield:Notify({ Title = "Error", Content = "Could not find Player or Items folder.", Duration = 3 })
        end
    end,
 })
 
 ---------------------------------------------------------
--- [2] 인피니티 일드 기능 (Admin Tab)
+-- [2] Infinity Yield (Admin Tab)
 ---------------------------------------------------------
 
 AdminTab:CreateButton({
-   Name = "🚀 인피니티 일드 (Infinity Yield) 실행",
+   Name = "🚀 Execute Infinity Yield",
    Callback = function()
        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infinityyield/master/source'))()
-       Rayfield:Notify({
-           Title = "실행됨",
-           Content = "Infinity Yield가 성공적으로 로드되었습니다.",
-           Duration = 3,
-       })
+       Rayfield:Notify({ Title = "Executed", Content = "Infinity Yield has been loaded.", Duration = 3 })
    end,
 })
